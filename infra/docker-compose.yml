@@ -19,13 +19,13 @@ services:
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       
-      # ✅ 핵심 수정: 리스너를 외부용(EXTERNAL)과 내부용(INTERNAL)으로 분리
+      # 리스너를 외부용(EXTERNAL)과 내부용(INTERNAL)으로 분리
       - KAFKA_LISTENERS=EXTERNAL://:9092,INTERNAL://:29092,CONTROLLER://:9093
       - KAFKA_ADVERTISED_LISTENERS=EXTERNAL://localhost:9092,INTERNAL://kafka:29092
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
       
-      # 부하 방지용 옵션 유지
+      # 부하 방지용 옵션
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
@@ -38,7 +38,7 @@ services:
       - "8080:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=mentoai-cluster
-      # ✅ Kafka UI는 이제 내부용 주소(29092)로 접속합니다.
+      # Kafka UI는 내부용 주소(29092)로 접속
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
     depends_on:
       - kafka
