@@ -1,6 +1,7 @@
-version: "3"
+version: "3.8"
 
 services:
+  # [1] Zookeeper - 기존대로 latest
   zookeeper:
     image: zookeeper:latest
     container_name: mentoai-zookeeper
@@ -8,6 +9,7 @@ services:
       - "2181:2181"
     platform: linux/arm64
 
+  # [2] Kafka - 기존대로 latest
   kafka:
     image: apache/kafka:latest
     container_name: mentoai-kafka
@@ -17,20 +19,14 @@ services:
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
-      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      
-      # 리스너를 외부용(EXTERNAL)과 내부용(INTERNAL)으로 분리
       - KAFKA_LISTENERS=EXTERNAL://:9092,INTERNAL://:29092,CONTROLLER://:9093
       - KAFKA_ADVERTISED_LISTENERS=EXTERNAL://localhost:9092,INTERNAL://kafka:29092
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
-      
-      # 부하 방지용 옵션
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
     platform: linux/arm64
 
+  # [3] Kafka UI - 기존대로 latest
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: mentoai-kafka-ui
@@ -38,8 +34,69 @@ services:
       - "8080:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=mentoai-cluster
-      # Kafka UI는 내부용 주소(29092)로 접속
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
     depends_on:
       - kafka
     platform: linux/arm64
+
+  # [4] Airflow DB (Postgres) - 안정성을 위해 13 권장 (latest도 가능은 함)
+  postgres:
+    image: postgres:13
+    container_name: airflow-postgres
+    platform: linux/arm64
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+
+  # [5] Airflow Webserver
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    container_name: airflow-webserver
+    platform: linux/arm64
+    command: webserver
+    ports:
+      - "8081:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../spark:/opt/airflow/spark
+      - ../.env:/opt/airflow/.env
+    depends_on:
+      - postgres
+
+  # [6] Airflow Scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    container_name: airflow-scheduler
+    platform: linux/arm64
+    command: scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../spark:/opt/airflow/spark
+      - ../.env:/opt/airflow/.env
+    depends_on:
+      - postgres
+      - airflow-webserver
+
+  # [7] Airflow Init - 중복 command 수정됨
+  airflow-init:
+    image: apache/airflow:2.8.1
+    container_name: airflow-init
+    platform: linux/arm64
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    command: >
+      bash -c "airflow db init && 
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
