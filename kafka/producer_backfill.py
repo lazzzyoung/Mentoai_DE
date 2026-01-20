@@ -1,4 +1,3 @@
-# kafka/producer_backfill.py
 import sys
 import os
 
@@ -13,25 +12,25 @@ from kafka import KafkaProducer
 from utils.scraper import fetch_job_list, get_detail_info, clean_space
 
 def run_backfill(start_page, end_page):
-    # [수정됨] Backfill용 Producer 설정
+    
+    bootstrap_server = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+    
     producer = KafkaProducer(
-        bootstrap_servers=['localhost:9092'],
+        bootstrap_servers=[bootstrap_server],
         value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        linger_ms=20,       # 대량 전송 시 효율을 위해 약간 뭉쳐서 보냄
-        batch_size=16384    # 배치 크기 최적화
+        linger_ms=20,
+        batch_size=16384
     )
     
-    # [수정됨] 토픽 명확히 분리
     TOPIC_NAME = 'career_backfill'
 
-    print(f"📂 [Backfill] 과거 데이터 수집 시작: {start_page} ~ {end_page}페이지")
+    print(f"📂 [Backfill] 과거 데이터 수집 시작: {start_page} ~ {end_page}페이지 (Server: {bootstrap_server})")
     print(f"   👉 Target Topic: {TOPIC_NAME}")
 
     total_count = 0
     
     for page in range(start_page, end_page + 1):
         print(f"\n📖 [Page {page}/{end_page}] 데이터 긁어오는 중...")
-        
         job_rows = fetch_job_list(page_index=page)
         
         if not job_rows:
@@ -44,7 +43,6 @@ def run_backfill(start_page, end_page):
             try:
                 row_html = str(row)
                 
-                # 1. ID 추출
                 auth_match = re.search(r"wantedAuthNo=([a-zA-Z0-9]+)", row_html)
                 if auth_match:
                     auth_no = auth_match.group(1)
@@ -54,7 +52,6 @@ def run_backfill(start_page, end_page):
                 
                 if not auth_no: continue
 
-                # 2. 리스트 정보 파싱
                 cols = row.select('td')
                 if len(cols) < 3: continue
                 
@@ -81,7 +78,6 @@ def run_backfill(start_page, end_page):
                 deadline_match = re.search(r"마감일\s?:\s?(\d{4}-\d{2}-\d{2})", td2_text)
                 deadline = deadline_match.group(1) if deadline_match else "채용시까지"
 
-                # 3. 상세 정보
                 detail = get_detail_info(auth_no)
                 if not detail:
                      detail = {"job_description": "수집 에러", "requirements": "", "preferred": ""}
@@ -102,11 +98,10 @@ def run_backfill(start_page, end_page):
                     "preferred_qualifications": detail["preferred"],
                     "collected_at": time.strftime('%Y-%m-%dT%H:%M:%SZ')
                 }
-                
 
                 producer.send(
                     TOPIC_NAME, 
-                    key=auth_no.encode('utf-8'), # source_id를 Key로 지정
+                    key=auth_no.encode('utf-8'),
                     value=data
                 )
                 

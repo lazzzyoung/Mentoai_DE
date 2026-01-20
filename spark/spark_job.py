@@ -1,15 +1,13 @@
-# spark/spark_job.py
 import os
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType
 
-# 1. .env 파일 로드 (환경변수 주입)
 load_dotenv()
 
 def create_spark_session():
-    # AWS 키 가져오기
+
     aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
     aws_region = os.getenv("AWS_REGION", "ap-northeast-2")
@@ -36,7 +34,6 @@ def run_spark_job():
     bucket_name = os.getenv("S3_BUCKET_NAME")
     print(f"🚀 Spark Streaming 시작: Kafka -> AWS S3 ({bucket_name})")
 
-    # 2. Kafka에서 데이터 읽기
     kafka_df = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", "localhost:9092") \
@@ -44,7 +41,7 @@ def run_spark_job():
         .option("startingOffsets", "earliest") \
         .load()
 
-    # 3. JSON 데이터 스키마 정의 (크롤링된 필드 모두 포함)
+    # JSON 데이터 스키마 정의 
     schema = StructType([
         StructField("source_id", StringType()),
         StructField("company", StringType()),
@@ -54,21 +51,20 @@ def run_spark_job():
         StructField("location", StringType()),
         StructField("deadline", StringType()),
         StructField("reg_date", StringType()),
-        # 상세 크롤링 필드
         StructField("description", StringType()),
         StructField("requirements", StringType()),
         StructField("preferred_qualifications", StringType()),
         StructField("collected_at", StringType())
     ])
 
-    # 4. 데이터 파싱
+    # 데이터 파싱
     processed_df = kafka_df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
 
-    # 5. AWS S3에 저장 (Parquet 포맷)
+    # S3에 저장 (Parquet 포맷)
     # path: 실제 데이터가 저장될 경로
-    # checkpointLocation: 스트리밍 상태 저장 (필수)
+    # checkpointLocation: 스트리밍 상태 저장
     query = processed_df.writeStream \
         .format("parquet") \
         .outputMode("append") \
