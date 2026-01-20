@@ -40,9 +40,6 @@ def get_detail_info(auth_no):
 
         soup = BeautifulSoup(resp.text, 'html.parser')
         
-        # -------------------------------------------------------
-        # 데이터 구조화 로직
-        # -------------------------------------------------------
         # 기본값 설정
         extracted_data = {
             "job_description": "상세 내용 없음", # 직무내용
@@ -53,7 +50,7 @@ def get_detail_info(auth_no):
         content_area = soup.find(id='contents') or soup.find(class_='emp_detail')
         
         if content_area:
-            # 1. 직무내용 추출 (보통 '직무내용' 헤더를 가진 iframe이나 td에 있음)
+            # 직무내용 추출 ('직무내용' 헤더를 가진 iframe이나 td에 있음)
             # 워크넷은 직무내용이 텍스트로 길게 들어가므로 별도 탐색
             job_desc_header = content_area.find(lambda tag: tag.name == "th" and "직무내용" in tag.get_text())
             if job_desc_header:
@@ -62,7 +59,7 @@ def get_detail_info(auth_no):
                 if job_desc_body:
                     extracted_data["job_description"] = clean_space(job_desc_body.get_text())
 
-            # 2. 자격요건 & 우대사항 (테이블 전체 스캔)
+            # 자격요건 & 우대사항 (테이블 전체 스캔)
             # 'th' 태그의 텍스트를 보고 판단하여 'td'의 내용을 수집
             
             req_list = []
@@ -168,9 +165,9 @@ def scrape_and_produce(page_index=1):
             deadline_match = re.search(r"마감일\s?:\s?(\d{4}-\d{2}-\d{2})", td2_text)
             deadline = deadline_match.group(1) if deadline_match else "채용시까지"
 
-            # -----------------------------------------------------
+            
             # [상세] 구조화된 데이터 추출 호출
-            # -----------------------------------------------------
+            
             detail_data = get_detail_info(auth_no)
             
             if detail_data:
@@ -194,10 +191,9 @@ def scrape_and_produce(page_index=1):
                 "location": location,
                 "deadline": deadline,
                 "reg_date": reg_date,
-                # ▼ 깔끔하게 분리된 필드들
-                "description": job_desc,      # 순수 직무내용
-                "requirements": req,          # 자격요건 (경력, 학력 등)
-                "preferred_qualifications": pref, # 우대사항
+                "description": job_desc,     
+                "requirements": req,         
+                "preferred_qualifications": pref, 
                 "collected_at": time.strftime('%Y-%m-%dT%H:%M:%SZ')
             }
             
