@@ -6,7 +6,7 @@ def run_consumer():
     topic_name = 'career_raw'
     print(f"👀 '{topic_name}' 토픽 감시 중... (Ctrl+C로 종료)")
 
-    # Consumer 설정
+    
     consumer = KafkaConsumer(
         topic_name,
         bootstrap_servers=['localhost:9092'],

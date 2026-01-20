@@ -1,4 +1,3 @@
-# kafka/producer_debug.py
 import sys
 import os
 import re
@@ -13,7 +12,7 @@ from utils.scraper import fetch_job_list, get_detail_info, clean_space
 def run_debug_producer():
     print("🐞 [DEBUG] 디버깅 모드 시작... 공고 리스트를 분석합니다.")
     
-    # 1. 리스트 가져오기 확인
+    
     job_rows = fetch_job_list(page_index=1)
     print(f"📌 [List] fetch_job_list 결과: 총 {len(job_rows)}개의 행(tr)을 찾았습니다.")
     
@@ -29,10 +28,9 @@ def run_debug_producer():
         
         row_str = str(row)
         
-        # 2. ID 추출 테스트
         # K로 시작하는 10자리 이상 숫자 (워크넷/고용24 표준)
         auth_match = re.search(r"(K\d{10,})", row_str)
-        # 혹시 W나 다른 문자로 시작하는 ID가 있는지 확인하기 위해 범용 패턴 추가
+        # W나 다른 문자로 시작하는 ID가 있는지 확인하기 위해 범용 패턴 추가
         generic_match = re.search(r"wantedAuthNo=(\w+)", row_str)
 
         if not auth_match:
@@ -47,14 +45,12 @@ def run_debug_producer():
         auth_no = auth_match.group(1)
         print(f"   ✅ ID 추출 성공: {auth_no}")
 
-        # 3. 컬럼(TD) 개수 확인
         cols = row.select('td')
         if len(cols) < 3:
             print(f"   ❌ [Skip] td 개수 부족 (발견: {len(cols)}개)")
             fail_count += 1
             continue
 
-        # 4. 회사명/제목 파싱 테스트
         try:
             td0_parts = cols[0].get_text(separator='|', strip=True).split('|')
             company = td0_parts[0].strip() if len(td0_parts) > 0 else "N/A"
@@ -73,8 +69,7 @@ def run_debug_producer():
             fail_count += 1
             continue
 
-        # 5. 상세 페이지 접근 테스트 (여기서 멈추는지 확인)
-        # 너무 많이 하면 오래 걸리니 앞쪽 3개와 뒤쪽 에러 의심 구간만 수행
+        # 상세 페이지 접근 테스트 (현재 상세 정보 수집 불가)
         if i < 3 or i > 25: 
             print("   👉 [Detail] 상세 페이지 접속 시도...")
             detail = get_detail_info(auth_no)
