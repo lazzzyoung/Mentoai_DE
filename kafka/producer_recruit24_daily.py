@@ -8,7 +8,7 @@ import json
 import time
 import re
 from kafka import KafkaProducer
-from utils.scraper import fetch_job_list, get_detail_info, clean_space
+from kafka.utils.recruit24_scraper import fetch_job_list, get_detail_info, clean_space
 
 def run_daily_producer():
     

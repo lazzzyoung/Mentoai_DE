@@ -78,11 +78,14 @@ services:
     container_name: airflow-scheduler
     platform: linux/arm64
     command: scheduler
+    env_file:
+      - ../.env
     environment:
       - AIRFLOW__WEBSERVER__SECRET_KEY=my_very_secure_secret_key_12345
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092 # 명시적으로 덮어쓸 수도 있음
     volumes:
       - ..:/opt/airflow
       # - ../dags:/opt/airflow/dags
