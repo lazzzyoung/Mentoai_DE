@@ -4,12 +4,15 @@ import json
 import time
 import logging
 import requests
+from dotenv import load_dotenv
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
+load_dotenv() 
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 from utils.wanted_scraper import fetch_job_id_list, fetch_job_detail_raw
+
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)

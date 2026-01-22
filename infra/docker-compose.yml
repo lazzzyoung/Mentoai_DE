@@ -42,15 +42,51 @@ services:
   
   postgres:
     image: postgres:13
-    container_name: airflow-postgres
+    container_name: mentoai-postgres
     platform: linux/arm64
     environment:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
+      - POSTGRES_DB=mentoai
     ports:
       - "5432:5432"
 
+  
+  spark-master:
+    image: apache/spark-py:latest
+    container_name: spark-master
+    user: root  
+    ports:
+      - "7077:7077"   
+      - "8082:8080"
+    env_file:
+      - ../.env
+    environment:
+      - SPARK_MODE=master
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - DB_URL=jdbc:postgresql://postgres:5432/mentoai
+    volumes:
+      - ..:/opt/airflow  
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    platform: linux/arm64
+
+  spark-worker:
+    image: apache/spark-py:latest
+    container_name: spark-worker
+    user: root
+    env_file:
+      - ../.env
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - DB_URL=jdbc:postgresql://postgres:5432/mentoai
+    volumes:
+      - ..:/opt/airflow
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    platform: linux/arm64
   
   airflow-webserver:
     image: apache/airflow:2.8.1
@@ -66,9 +102,6 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
       - ..:/opt/airflow
-      # - ../dags:/opt/airflow/dags
-      # - ../spark:/opt/airflow/spark
-      # - ../.env:/opt/airflow/.env
     depends_on:
       - postgres
 
@@ -88,9 +121,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092 # 명시적으로 덮어쓸 수도 있음
     volumes:
       - ..:/opt/airflow
-      # - ../dags:/opt/airflow/dags
-      # - ../spark:/opt/airflow/spark
-      # - ../.env:/opt/airflow/.env
+
     depends_on:
       - postgres
       - airflow-webserver
