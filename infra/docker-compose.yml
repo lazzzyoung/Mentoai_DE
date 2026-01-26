@@ -53,7 +53,9 @@ services:
 
   
   spark-master:
-    image: apache/spark-py:latest
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
     container_name: spark-master
     user: root  
     ports:
@@ -71,7 +73,9 @@ services:
     platform: linux/arm64
 
   spark-worker:
-    image: apache/spark-py:latest
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
     container_name: spark-worker
     user: root
     env_file:
@@ -101,25 +105,31 @@ services:
     
   
   airflow-webserver:
-    image: apache/airflow:2.8.1
+    build:
+      context: ./airflow              
+      dockerfile: Dockerfile
     container_name: airflow-webserver
     platform: linux/arm64
     command: webserver
     ports:
       - "8081:8080"
+    env_file:
+      - ../.env  
     environment:
       - AIRFLOW__WEBSERVER__SECRET_KEY=my_very_secure_secret_key_12345
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
       - ..:/opt/airflow
+      - /var/run/docker.sock:/var/run/docker.sock 
     depends_on:
       - postgres
 
-
   airflow-scheduler:
-    image: apache/airflow:2.8.1
+    build:
+      context: ./airflow              
+      dockerfile: Dockerfile
     container_name: airflow-scheduler
     platform: linux/arm64
     command: scheduler
@@ -128,16 +138,15 @@ services:
     environment:
       - AIRFLOW__WEBSERVER__SECRET_KEY=my_very_secure_secret_key_12345
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092 
     volumes:
       - ..:/opt/airflow
-
+      - /var/run/docker.sock:/var/run/docker.sock 
     depends_on:
       - postgres
       - airflow-webserver
-
 
   airflow-init:
     image: apache/airflow:2.8.1
@@ -146,7 +155,7 @@ services:
     depends_on:
       - postgres
     environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
     command: >
       bash -c "airflow db init && 
       airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"

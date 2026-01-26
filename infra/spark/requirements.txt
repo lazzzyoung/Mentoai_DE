@@ -1,0 +1,7 @@
+python-dotenv
+kafka-python
+boto3
+psycopg2-binary
+qdrant-client
+sentence-transformers
+torch --extra-index-url https://download.pytorch.org/whl/cpu
