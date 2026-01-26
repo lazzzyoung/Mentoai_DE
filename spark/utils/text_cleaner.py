@@ -8,7 +8,8 @@ DETAIL_SCHEMA = StructType([
     StructField("main_tasks", StringType()),
     StructField("requirements", StringType()),
     StructField("preferred_points", StringType()),
-    StructField("benefits", StringType())
+    StructField("benefits", StringType()),
+    StructField("hire_rounds", StringType())
 ])
 
 RAW_DATA_SCHEMA = StructType([
@@ -48,6 +49,7 @@ def clean_job_details(raw_df):
         col("raw_data.detail.requirements").alias("requirements"),
         col("raw_data.detail.preferred_points").alias("preferred_points"),
         col("raw_data.detail.benefits").alias("benefits"),
+        col("raw_data.detail.hire_rounds").alias("hire_rounds"),
         coalesce(col("raw_data.due_time"), lit("상시채용")).alias("due_time"), 
         col("raw_data.is_newbie").alias("is_newbie"),
         col("raw_data.employment_type").alias("employment_type"),
