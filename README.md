@@ -1,12 +1,12 @@
 # MentoAI: Personalized AI Career Roadmap Service
 
-**MentoAI**는 사용자의 기술 스펙과 희망 직무를 분석하여, 최신 채용 공고 기반의 맞춤형 커리어 성장 로드맵을 제공하는 AI 서비스입니다. 데이터 엔지니어링 파이프라인(Kafka, Spark, Airflow)과 RAG(Retrieval-Augmented Generation) 기술을 결합하여, 단순한 공고 추천을 넘어 구체적인 학습 전략과 액션 플랜을 제시합니다.
+**MentoAI**는 사용자의 기술 스펙과 희망 직무를 분석하여, 최신 채용 공고 기반의 맞춤형 커리어 성장 로드맵을 제공하는 AI 서비스입니다. 
+데이터 엔지니어링 파이프라인(Kafka, Spark, Airflow)과 RAG(Retrieval-Augmented Generation) 기술을 결합하여, 단순한 공고 추천을 넘어 구체적인 학습 전략과 액션 플랜을 제시합니다.
 
 ## 🏗️ System Architecture
 
 데이터의 수집부터 서비스 제공까지의 전체 데이터 흐름도입니다.
 
-```text
 [Data Ingestion Layer]             [Data Processing Layer]
 +-----------------+               +--------------------------+
 |  Job Sites      |   Crawling    |  Apache Spark (ETL)      |
@@ -265,3 +265,28 @@ VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airf
 
 
 
+
+
+[ Data Ingestion ]       [ Data Lake / Warehouse ]       [ AI Serving Layer ]
+      (Bronze)                  (Silver / Gold)               (RAG Engine)
+
+  +--------------+          +------------------+          +------------------+
+  | Job Source   |          |  AWS S3 (Raw)    |          |  FastAPI Server  |
+  | (Wanted API) |          |  [Bronze Layer]  |          |  (LangChain/RAG) |
+  +--------------+          +------------------+          +------------------+
+         |                          ^                             ^
+      (Consume)                     |                             |
+         v                   (Scheduled Batch)             (Vector Search)
+  +--------------+          +------------------+          +------------------+
+  | Kafka Cluster| --------> |  Spark Cluster   | -------> |    Qdrant DB     |
+  | (Streaming)  |          |  (Clean/Embed)   |          |   [Gold Layer]   |
+  +--------------+          +------------------+          +------------------+
+                                    |                             ^
+                             (Save Standard)                      |
+                                    v                             |
+                            +------------------+                  |
+                            |    Postgres      | -----------------+
+                            |  [Silver Layer]  |
+                            +------------------+
+
+[ Orchestration: Apache Airflow (Docker-out-of-Docker) ]
