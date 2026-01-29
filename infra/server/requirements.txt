@@ -1,0 +1,25 @@
+# --- 유틸리티 ---
+python-dotenv
+
+# --- Server ---
+fastapi
+uvicorn
+
+# --- Data Engineering & DB ---
+psycopg2-binary
+sqlalchemy
+pydantic
+
+# --- LangChain Core ---
+langchain
+langchain-core
+langchain-community
+langchain-google-genai>=2.0.0
+
+# --- Vector DB ---
+langchain-qdrant
+qdrant-client>=1.9.0
+
+# --- Embeddings ---
+langchain-huggingface
+sentence-transformers

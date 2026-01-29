@@ -7,44 +7,54 @@ from pyspark.sql.functions import col
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.spark_session import create_spark_session
 from utils.text_cleaner import clean_job_details
-from utils.writers import write_to_postgres
+
 
 load_dotenv()
 
-def run_process_silver():
-    spark = create_spark_session("MentoAI_Job2_Silver")
+def run_recovery_silver():
+    # 세션 생성
+    spark = create_spark_session("MentoAI_Job2_Silver_Recovery")
     
     bucket_name = os.getenv("S3_BUCKET_NAME")
-    
     bronze_path = f"s3a://{bucket_name}/bronze/career_raw/"
     
-    print(f"📂 Reading from S3 Bronze: {bronze_path}")
+    print(f"📂 Reading ALL data from S3 Bronze (Batch Mode): {bronze_path}")
 
-    # S3 Bronze 데이터 읽기
+    # read (Batch)
     try:
-        bronze_schema = spark.read.parquet(bronze_path).schema
+        
+        raw_df = spark.read.parquet(bronze_path)
     except Exception as e:
-        print("⚠️ Bronze 데이터 경로가 없거나 비어있습니다. 먼저 job_ingest_bronze.py를 실행해주세요.")
+        print(f"⚠️ 에러 발생: {e}")
         return
 
-    # Streaming DataFrame 생성
-    raw_file_df = spark.readStream \
-        .format("parquet") \
-        .schema(bronze_schema) \
-        .option("maxFilesPerTrigger", 100) \
-        .load(bronze_path)
-    
-    # Bronze의 'raw_json' 컬럼을 'value'로 변경하여 패스
-    input_df = raw_file_df.withColumnRenamed("raw_json", "value")
-    
-    # 파싱 및 정제
+    # 데이터 정제
+    input_df = raw_df.withColumnRenamed("raw_json", "value")
     refined_df = clean_job_details(input_df)
     
-    # PostgreSQL Silver에 저장
-    query = write_to_postgres(refined_df)
-    
-    print("⏳ Silver Layer(Postgres) 적재 중...")
-    query.awaitTermination()
+    count = refined_df.count()
+    print(f" 정제된 데이터 개수: {count}건")
+
+    if count > 0:
+        # PostgreSQL에 직접 쓰기 (Batch)
+        db_url = os.getenv("DB_URL", "jdbc:postgresql://postgres:5432/mentoai")
+        print("💾 Saving to Postgres...")
+        
+        refined_df.write \
+            .format("jdbc") \
+            .option("url", db_url) \
+            .option("dbtable", "career_jobs") \
+            .option("user", "airflow") \
+            .option("password", "airflow") \
+            .option("driver", "org.postgresql.Driver") \
+            .mode("overwrite") \
+            .save()
+        
+        print("🎉 career_jobs 테이블 생성 및 데이터 적재 완료!")
+    else:
+        print(" 적재할 데이터가 없습니다.")
+
+    spark.stop()
 
 if __name__ == "__main__":
-    run_process_silver()
+    run_recovery_silver()

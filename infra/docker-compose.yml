@@ -50,6 +50,8 @@ services:
       - POSTGRES_DB=mentoai
     ports:
       - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
 
   
   spark-master:
@@ -159,3 +161,23 @@ services:
     command: >
       bash -c "airflow db init && 
       airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+
+
+  ai-server:
+    build:
+      context: ..                
+      dockerfile: infra/server/Dockerfile  
+    container_name: mentoai-ai-server
+    platform: linux/arm64
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql://airflow:airflow@postgres:5432/mentoai
+      - QDRANT_HOST=mentoai-qdrant
+    volumes:
+      - ../server:/app/server
+    depends_on:
+      - postgres
+      - qdrant
