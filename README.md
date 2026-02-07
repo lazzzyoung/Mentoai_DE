@@ -54,6 +54,8 @@ User <-> FastAPI (RAG) <-> Qdrant
 
 ```text
 Mentoai_DE/
+├── pyproject.toml
+├── .python-version
 ├── dags/
 │   ├── mentoai_pipeline.py
 │   ├── producer_daily_dag.py
@@ -100,10 +102,36 @@ Mentoai_DE/
 ## Prerequisites
 
 - Docker / Docker Compose
-- Python 3.9+ (로컬 스크립트 직접 실행 시)
+- `uv` (Python 의존성/실행 관리)
+- Python 3.10+ (로컬 스크립트 직접 실행 시)
 - 필수 키/접근 정보
   - Google Gemini API Key
   - AWS S3 Access Key
+
+## Dependency Management (uv)
+
+이 프로젝트는 `requirements.txt` 대신 루트 `pyproject.toml`의 dependency group을 사용합니다.
+
+- `server`: FastAPI + LangChain + Qdrant
+- `spark`: Spark 보조 파이썬 의존성 + `torch`
+- `airflow`: DAG 실행 및 수집/연동 의존성
+- `dev`: 테스트/정적 분석용
+
+예시:
+
+```bash
+# lockfile 생성/갱신
+uv lock
+
+# server 개발 환경
+uv sync --group server
+
+# Spark 실행 스크립트용 환경
+uv sync --group spark
+
+# Airflow/DAG 로컬 실행용 환경
+uv sync --group airflow
+```
 
 ## Quick Start
 
@@ -140,6 +168,8 @@ QDRANT_HOST=mentoai-qdrant
 cd infra
 docker compose up -d --build
 ```
+
+`infra/*/Dockerfile`은 내부에서 `uv`로 group 의존성을 설치합니다.
 
 ### 3) 사용자 테이블/샘플 데이터 준비
 
@@ -206,6 +236,7 @@ curl -X POST "http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1" \
 - Data: Kafka, Spark (PySpark)
 - Storage: AWS S3, PostgreSQL, Qdrant
 - AI/Backend: FastAPI, LangChain, Gemini, KoSimCSE
+- Dependency Management: uv (`pyproject.toml` dependency groups)
 
 ## Troubleshooting Notes
 

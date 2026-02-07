@@ -56,8 +56,8 @@ services:
   
   spark-master:
     build:
-      context: ./spark
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infra/spark/Dockerfile
     container_name: spark-master
     user: root  
     ports:
@@ -76,8 +76,8 @@ services:
 
   spark-worker:
     build:
-      context: ./spark
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infra/spark/Dockerfile
     container_name: spark-worker
     user: root
     env_file:
@@ -108,8 +108,8 @@ services:
   
   airflow-webserver:
     build:
-      context: ./airflow              
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infra/airflow/Dockerfile
     container_name: airflow-webserver
     platform: linux/arm64
     command: webserver
@@ -130,8 +130,8 @@ services:
 
   airflow-scheduler:
     build:
-      context: ./airflow              
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infra/airflow/Dockerfile
     container_name: airflow-scheduler
     platform: linux/arm64
     command: scheduler

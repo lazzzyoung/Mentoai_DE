@@ -5,10 +5,11 @@ WORKDIR /app
 # 시스템 의존성 설치 (Postgres 연결용)
 RUN apt-get update && apt-get install -y libpq-dev gcc curl && rm -rf /var/lib/apt/lists/*
 
-# 경로 변경에 따른 requirements 복사
-# (docker-compose에서 context를 프로젝트 루트로 잡을 예정이므로 경로를 맞춰줍니다)
-COPY infra/server/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml ./
+RUN UV_CACHE_DIR=/tmp/uv-cache \
+    uv pip install --system --break-system-packages --group server --project /app
 
 RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='BM-K/KoSimCSE-roberta-multitask')"
 

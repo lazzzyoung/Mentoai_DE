@@ -1,0 +1,50 @@
+[project]
+name = "mentoai-de"
+version = "0.1.0"
+description = "MentoAI data engineering and RAG backend"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+airflow = [
+    "pendulum",
+    "python-dotenv",
+    "requests",
+    "beautifulsoup4",
+    "kafka-python",
+    "apache-airflow-providers-docker",
+    "apache-airflow-providers-slack",
+    "psycopg2-binary",
+    "boto3",
+    "qdrant-client>=1.9.0",
+]
+spark = [
+    "python-dotenv",
+    "kafka-python",
+    "psycopg2-binary",
+    "boto3",
+    "qdrant-client>=1.9.0",
+    "sentence-transformers",
+    "torch",
+]
+server = [
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "psycopg2-binary",
+    "sqlalchemy",
+    "pydantic",
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    "langchain-google-genai>=2.0.0",
+    "langchain-qdrant",
+    "qdrant-client>=1.9.0",
+    "langchain-huggingface",
+    "sentence-transformers",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
