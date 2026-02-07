@@ -135,7 +135,7 @@ class RAGService:
             collection_name=self.settings.collection_name,
             embedding=embeddings,
             content_payload_key="full_text",
-            metadata_payload_key=None,
+            metadata_payload_key="metadata",
         )
 
         logger.info("Initializing Google Gemini model...")
