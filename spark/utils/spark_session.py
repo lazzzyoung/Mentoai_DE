@@ -37,5 +37,7 @@ def create_spark_session(
         )
 
     spark = builder.getOrCreate()
-    spark.sparkContext.setLogLevel("WARN")
+    spark_context = getattr(spark, "sparkContext", None)
+    if spark_context is not None:
+        spark_context.setLogLevel("WARN")
     return spark

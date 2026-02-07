@@ -1,4 +1,5 @@
 import logging
+from typing import TYPE_CHECKING, Any, cast
 
 from dotenv import load_dotenv
 from pyspark.sql.functions import coalesce, col, lit
@@ -8,6 +9,9 @@ from sentence_transformers import SentenceTransformer
 
 from utils.config import SparkRuntimeConfig, load_runtime_config
 from utils.spark_session import create_spark_session
+
+if TYPE_CHECKING:
+    from pyspark.core.rdd import RDD
 
 load_dotenv()
 
@@ -118,7 +122,8 @@ def run_upsert_gold() -> None:
     init_qdrant_collection(runtime_config)
 
     logger.info("Embedding 및 Qdrant upsert를 시작합니다.")
-    partition_counts = target_df.rdd.mapPartitions(
+    target_rdd = cast("RDD[Any]", target_df.rdd)
+    partition_counts = target_rdd.mapPartitions(
         lambda it: process_partition(it, runtime_config)
     ).collect()
     total_points = sum(partition_counts)
