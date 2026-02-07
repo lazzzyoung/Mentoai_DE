@@ -48,4 +48,10 @@ server = [
 dev = [
     "pytest",
     "ruff",
+    "poethepoet",
 ]
+
+[tool.poe.tasks]
+lint = "ruff check ."
+lint_fix = "ruff check . --fix"
+format = "ruff format ."
