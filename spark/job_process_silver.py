@@ -1,60 +1,52 @@
-import sys
-import os
-from dotenv import load_dotenv
-from pyspark.sql.functions import col
+import logging
 
-# 경로 설정
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+from dotenv import load_dotenv
+
+from utils.config import load_runtime_config
 from utils.spark_session import create_spark_session
 from utils.text_cleaner import clean_job_details
-
+from utils.writers import write_batch_to_postgres
 
 load_dotenv()
 
-def run_recovery_silver():
-    # 세션 생성
-    spark = create_spark_session("MentoAI_Job2_Silver_Recovery")
-    
-    bucket_name = os.getenv("S3_BUCKET_NAME")
-    bronze_path = f"s3a://{bucket_name}/bronze/career_raw/"
-    
-    print(f"📂 Reading ALL data from S3 Bronze (Batch Mode): {bronze_path}")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    # read (Batch)
+
+def run_recovery_silver() -> None:
+    runtime_config = load_runtime_config()
+    if not runtime_config.s3_bucket_name:
+        raise ValueError("S3_BUCKET_NAME 환경변수가 필요합니다.")
+
+    spark = create_spark_session("MentoAI_Job2_Silver_Recovery", runtime_config)
+
+    bronze_path = f"s3a://{runtime_config.s3_bucket_name}/bronze/career_raw/"
+    logger.info("Bronze 데이터를 읽습니다: %s", bronze_path)
+
     try:
-        
         raw_df = spark.read.parquet(bronze_path)
-    except Exception as e:
-        print(f"⚠️ 에러 발생: {e}")
+    except Exception as exc:
+        logger.error("Bronze 데이터 로드 실패: %s", exc)
+        spark.stop()
         return
 
-    # 데이터 정제
     input_df = raw_df.withColumnRenamed("raw_json", "value")
     refined_df = clean_job_details(input_df)
-    
-    count = refined_df.count()
-    print(f" 정제된 데이터 개수: {count}건")
 
-    if count > 0:
-        # PostgreSQL에 직접 쓰기 (Batch)
-        db_url = os.getenv("DB_URL", "jdbc:postgresql://postgres:5432/mentoai")
-        print("💾 Saving to Postgres...")
-        
-        refined_df.write \
-            .format("jdbc") \
-            .option("url", db_url) \
-            .option("dbtable", "career_jobs") \
-            .option("user", "airflow") \
-            .option("password", "airflow") \
-            .option("driver", "org.postgresql.Driver") \
-            .mode("overwrite") \
-            .save()
-        
-        print("🎉 career_jobs 테이블 생성 및 데이터 적재 완료!")
-    else:
-        print(" 적재할 데이터가 없습니다.")
+    record_count = refined_df.count()
+    logger.info("정제된 데이터 개수: %s", record_count)
+
+    write_batch_to_postgres(
+        df=refined_df,
+        db_url=runtime_config.db_url,
+        db_user=runtime_config.db_user,
+        db_password=runtime_config.db_password,
+        db_table="career_jobs",
+        mode="overwrite",
+    )
 
     spark.stop()
+
 
 if __name__ == "__main__":
     run_recovery_silver()

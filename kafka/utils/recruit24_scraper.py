@@ -1,20 +1,24 @@
-# kafka/utils/scraper.py
-import time
-import re
-import requests
+import logging
 import random
+import re
+import time
+
+import requests
 from bs4 import BeautifulSoup
 
-def clean_space(text):
-    if not text: return ""
-    return re.sub(r'\s+', ' ', text).strip()
+from utils.recruit24_parser import clean_space
+
+logger = logging.getLogger(__name__)
 
 def get_detail_info(auth_no):
-    """
-    상세 페이지 데이터 추출 (민간 공고 호환성 강화)
-    """
+    """상세 페이지 데이터 추출 (민간 공고 호환성 강화)."""
     detail_url = f"https://www.work.go.kr/empInfo/empInfoSrch/detail/empDetailAuthView.do?wantedAuthNo={auth_no}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0 Safari/537.36'}
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+    }
     
     # 기본값 (상세 수집 실패 시에도 이 값으로 리턴)
     extracted_data = {
@@ -64,18 +68,20 @@ def get_detail_info(auth_no):
                     elif any(kw in h_txt for kw in ["우대조건", "전공", "자격면허", "외국어", "컴퓨터"]):
                         pref_list.append(f"{h_txt}: {b_txt}")
 
-            if req_list: extracted_data["requirements"] = " | ".join(req_list)
-            if pref_list: extracted_data["preferred"] = " | ".join(pref_list)
+            if req_list:
+                extracted_data["requirements"] = " | ".join(req_list)
+            if pref_list:
+                extracted_data["preferred"] = " | ".join(pref_list)
 
         return extracted_data
 
-    except Exception as e:
+    except Exception as exc:
         # 에러가 나도 기본값은 반환해서 리스트 정보라도 저장하게 함
-        print(f"      ⚠️ 상세 페이지 파싱 실패({auth_no}): {e}")
+        logger.warning("상세 페이지 파싱 실패 (%s): %s", auth_no, exc)
         return extracted_data
 
 def fetch_job_list(page_index):
-    """리스트 페이지 호출 (50개씩)"""
+    """리스트 페이지 호출 (50개씩)."""
     url = "https://www.work24.go.kr/wk/a/b/1200/retriveDtlEmpSrchList.do"
     params = {
         "occupation": "135101,135102,136102,026,024",
@@ -83,13 +89,16 @@ def fetch_job_list(page_index):
         "sortField": "DATE",
         "sortOrderBy": "DESC",
         "pageIndex": page_index,
-        "siteClcd": "all"
+        "siteClcd": "all",
     }
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    }
     
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        return soup.find_all('tr', id=re.compile(r'^list\d+'))
-    except Exception:
+        soup = BeautifulSoup(response.text, "html.parser")
+        return soup.find_all("tr", id=re.compile(r"^list\d+"))
+    except Exception as exc:
+        logger.warning("채용 공고 리스트 요청 실패 (page=%s): %s", page_index, exc)
         return []

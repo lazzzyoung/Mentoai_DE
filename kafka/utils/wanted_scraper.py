@@ -1,13 +1,13 @@
-import requests
-import time
-import random
 import logging
+import random
+import time
+
+import requests
 
 logger = logging.getLogger(__name__)
 
 # 리스트 API를 순회, 공고 ID 목록 수집 함수
 def fetch_job_id_list(session, base_url, group_id, job_id, limit=100):
-    
     job_ids = []
     offset = 0
     api_url = f"{base_url}/api/chaos/navigation/v1/results"
@@ -43,22 +43,21 @@ def fetch_job_id_list(session, base_url, group_id, job_id, limit=100):
                 break
                 
             # ID 추출
-            current_ids = [job['id'] for job in jobs]
+            current_ids = [job["id"] for job in jobs]
             job_ids.extend(current_ids)
-            
+
             logger.info(f"   + {len(current_ids)}개 수집 (현재 누적: {len(job_ids)}개)")
 
             # 다음 페이지 확인
-            if not links.get('next'):
+            if not links.get("next"):
                 break
-            
+
+            if len(job_ids) >= limit:
+                logger.info("설정된 제한(%s)에 도달하여 ID 수집을 중단합니다.", limit)
+                break
+
             offset += 20
-            
-            # 안전장치: 너무 많이 긁으면 중단 (테스트용)
-            # if len(job_ids) >= limit:
-            #     logger.info(f"🛑 설정된 제한({limit})에 도달하여 ID 수집 중단")
-            #     break
-            
+
             # 봇 탐지 회피용
             time.sleep(random.uniform(0.5, 1.0))
 
@@ -70,12 +69,11 @@ def fetch_job_id_list(session, base_url, group_id, job_id, limit=100):
             logger.error(f"⚠️ 리스트 수집 중 알 수 없는 에러: {e}")
             break
             
-    return job_ids
+    return job_ids[:limit]
 
-#상세 API 호출 후 Raw Json 반환
+# 상세 API 호출 후 Raw Json 반환
 def fetch_job_detail_raw(session, base_url, job_id):
-   
-    #Request URL에 현재 시간을 파라미터로 넣어 전송하기위해 작성
+    # Request URL에 현재 시간을 파라미터로 넣어 전송하기위해 작성
     timestamp = int(time.time() * 1000)
     target_url = f"{base_url}/api/chaos/jobs/v4/{job_id}/details?{timestamp}="
     
@@ -83,7 +81,7 @@ def fetch_job_detail_raw(session, base_url, job_id):
         response = session.get(target_url, timeout=10)
         
         if response.status_code == 200:
-            return response.json().get('data', {}).get('job', {})
+            return response.json().get("data", {}).get("job", {})
         elif response.status_code == 404:
             logger.warning(f"⚠️ 공고 삭제됨 또는 비공개 (ID: {job_id})")
             return None
