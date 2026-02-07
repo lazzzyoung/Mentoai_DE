@@ -49,7 +49,9 @@ def parse_list_row(row: Any) -> dict[str, str] | None:
     pay, location = _parse_pay_and_location(td1_parts)
 
     td2_text = cols[2].get_text(separator="|", strip=True)
-    reg_date = _extract_first_match(_REG_DATE_PATTERN, td2_text, time.strftime("%Y-%m-%d"))
+    reg_date = _extract_first_match(
+        _REG_DATE_PATTERN, td2_text, time.strftime("%Y-%m-%d")
+    )
     deadline = _extract_first_match(_DEADLINE_PATTERN, td2_text, "채용시까지")
 
     return {
@@ -63,7 +65,9 @@ def parse_list_row(row: Any) -> dict[str, str] | None:
     }
 
 
-def build_job_message(parsed_row: dict[str, str], detail: dict[str, str] | None) -> dict[str, str]:
+def build_job_message(
+    parsed_row: dict[str, str], detail: dict[str, str] | None
+) -> dict[str, str]:
     detail_payload = detail or DEFAULT_DETAIL
     auth_no = parsed_row["auth_no"]
 
@@ -76,9 +80,15 @@ def build_job_message(parsed_row: dict[str, str], detail: dict[str, str] | None)
         "location": parsed_row["location"],
         "deadline": parsed_row["deadline"],
         "reg_date": parsed_row["reg_date"],
-        "description": detail_payload.get("job_description", DEFAULT_DETAIL["job_description"]),
-        "requirements": detail_payload.get("requirements", DEFAULT_DETAIL["requirements"]),
-        "preferred_qualifications": detail_payload.get("preferred", DEFAULT_DETAIL["preferred"]),
+        "description": detail_payload.get(
+            "job_description", DEFAULT_DETAIL["job_description"]
+        ),
+        "requirements": detail_payload.get(
+            "requirements", DEFAULT_DETAIL["requirements"]
+        ),
+        "preferred_qualifications": detail_payload.get(
+            "preferred", DEFAULT_DETAIL["preferred"]
+        ),
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -103,7 +113,10 @@ def _parse_pay_and_location(parts: list[str]) -> tuple[str, str]:
         part = clean_space(part)
         if any(keyword in part for keyword in ("연봉", "월급", "시급")):
             pay = part
-        elif any(keyword in part for keyword in ("시 ", "구 ", "군 ")) and "주" not in part:
+        elif (
+            any(keyword in part for keyword in ("시 ", "구 ", "군 "))
+            and "주" not in part
+        ):
             location = part
 
     return pay, location

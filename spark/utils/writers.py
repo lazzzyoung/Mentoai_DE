@@ -41,4 +41,6 @@ def write_batch_to_postgres(
         mode
     ).save()
 
-    logger.info("Postgres 적재 완료: table=%s count=%s mode=%s", db_table, record_count, mode)
+    logger.info(
+        "Postgres 적재 완료: table=%s count=%s mode=%s", db_table, record_count, mode
+    )

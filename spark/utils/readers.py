@@ -12,7 +12,9 @@ def read_stream_from_kafka(
     topic_name: str,
     starting_offsets: str = "earliest",
 ) -> DataFrame:
-    logger.info("Kafka Read Stream 초기화: bootstrap=%s topic=%s", bootstrap_servers, topic_name)
+    logger.info(
+        "Kafka Read Stream 초기화: bootstrap=%s topic=%s", bootstrap_servers, topic_name
+    )
     return (
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", bootstrap_servers)
@@ -23,7 +25,9 @@ def read_stream_from_kafka(
     )
 
 
-def read_stream_from_s3(spark: SparkSession, bucket_name: str, source_path: str) -> DataFrame:
+def read_stream_from_s3(
+    spark: SparkSession, bucket_name: str, source_path: str
+) -> DataFrame:
     full_path = f"s3a://{bucket_name}/{source_path}"
     logger.info("S3 Stream Read 시작: %s", full_path)
 

@@ -7,8 +7,7 @@ from airflow.operators.bash import BashOperator
 KST = pendulum.timezone("Asia/Seoul")
 SPARK_MASTER_URL = "spark://spark-master:7077"
 SPARK_SUBMIT = (
-    "docker exec spark-master /opt/spark/bin/spark-submit "
-    f"--master {SPARK_MASTER_URL}"
+    f"docker exec spark-master /opt/spark/bin/spark-submit --master {SPARK_MASTER_URL}"
 )
 
 DEFAULT_ARGS = {

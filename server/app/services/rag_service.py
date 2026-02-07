@@ -19,7 +19,12 @@ from server.app.core.config import Settings
 from server.app.repositories.user_repository import UserRepository
 from server.app.schemas.v1 import RoadmapResponseV1
 from server.app.schemas.v2 import AnalysisResultV2, JobRecommendation, RoadmapResponseV2
-from server.app.schemas.v3 import ActionItem, DetailedAnalysisResponse, JobSummaryList, RecommendationListResponse
+from server.app.schemas.v3 import (
+    ActionItem,
+    DetailedAnalysisResponse,
+    JobSummaryList,
+    RecommendationListResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +163,9 @@ class RAGService:
             "skills": list(user_info.get("skills") or []),
         }
 
-    def _build_user_query_text(self, user_info: UserInfo, include_career: bool = False) -> str:
+    def _build_user_query_text(
+        self, user_info: UserInfo, include_career: bool = False
+    ) -> str:
         base_query = (
             f"희망직무: {user_info['desired_job']}, "
             f"보유기술: {', '.join(user_info['skills'])}"
@@ -246,7 +253,9 @@ class RAGService:
             return {"gemini_response": str(response.content)}
         except Exception as exc:
             logger.error("Gemini 연결 테스트 실패: %s", exc)
-            raise HTTPException(status_code=500, detail="Gemini connection failed") from exc
+            raise HTTPException(
+                status_code=500, detail="Gemini connection failed"
+            ) from exc
 
     def generate_career_roadmap_v1(self, user_id: int) -> RoadmapResponseV1:
         try:
@@ -283,7 +292,9 @@ class RAGService:
             raise
         except Exception as exc:
             logger.error("V1 roadmap 생성 실패: %s", exc)
-            raise HTTPException(status_code=500, detail="V1 roadmap generation failed") from exc
+            raise HTTPException(
+                status_code=500, detail="V1 roadmap generation failed"
+            ) from exc
 
     def generate_career_roadmap_v2(self, user_id: int) -> RoadmapResponseV2:
         try:
@@ -334,16 +345,22 @@ class RAGService:
             raise
         except Exception as exc:
             logger.error("V2 roadmap 생성 실패: %s", exc)
-            raise HTTPException(status_code=500, detail="V2 roadmap generation failed") from exc
+            raise HTTPException(
+                status_code=500, detail="V2 roadmap generation failed"
+            ) from exc
 
     def recommend_jobs_list(self, user_id: int) -> RecommendationListResponse:
         try:
             user_info = self._fetch_user_info(user_id)
-            user_query_text = self._build_user_query_text(user_info, include_career=True)
+            user_query_text = self._build_user_query_text(
+                user_info, include_career=True
+            )
 
             retrieved_docs = self._similarity_search(user_query_text, limit=5)
             if not retrieved_docs:
-                return RecommendationListResponse(user_name=user_info["username"], recommendations=[])
+                return RecommendationListResponse(
+                    user_name=user_info["username"], recommendations=[]
+                )
 
             parser = JsonOutputParser(pydantic_object=JobSummaryList)
             prompt = ChatPromptTemplate.from_template(RECOMMENDATION_PROMPT)
@@ -366,7 +383,9 @@ class RAGService:
             raise
         except Exception as exc:
             logger.error("추천 목록 생성 실패: %s", exc)
-            raise HTTPException(status_code=500, detail="Job recommendation failed") from exc
+            raise HTTPException(
+                status_code=500, detail="Job recommendation failed"
+            ) from exc
 
     def analyze_job_detail(self, job_id: int, user_id: int) -> DetailedAnalysisResponse:
         try:
@@ -375,7 +394,9 @@ class RAGService:
 
             payload = self._fetch_job_payload(job_id)
             if not payload:
-                raise HTTPException(status_code=404, detail="해당 공고를 찾을 수 없습니다.")
+                raise HTTPException(
+                    status_code=404, detail="해당 공고를 찾을 수 없습니다."
+                )
 
             job_full_text = str(payload.get("full_text") or "")
             company = str(payload.get("company") or "미상")
@@ -409,4 +430,6 @@ class RAGService:
             raise
         except Exception as exc:
             logger.error("상세 분석 생성 실패: %s", exc)
-            raise HTTPException(status_code=500, detail="Detailed analysis failed") from exc
+            raise HTTPException(
+                status_code=500, detail="Detailed analysis failed"
+            ) from exc

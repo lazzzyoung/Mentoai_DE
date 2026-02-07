@@ -23,7 +23,9 @@ BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 def _create_producer() -> KafkaProducer:
     return KafkaProducer(
         bootstrap_servers=[BOOTSTRAP_SERVERS],
-        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode(
+            "utf-8"
+        ),
         linger_ms=20,
         batch_size=16384,
     )

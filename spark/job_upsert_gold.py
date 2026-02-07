@@ -27,13 +27,17 @@ def get_postgres_properties(runtime_config: SparkRuntimeConfig) -> dict[str, str
 
 
 def init_qdrant_collection(runtime_config: SparkRuntimeConfig) -> None:
-    client = QdrantClient(host=runtime_config.qdrant_host, port=runtime_config.qdrant_port)
+    client = QdrantClient(
+        host=runtime_config.qdrant_host, port=runtime_config.qdrant_port
+    )
     if client.collection_exists(collection_name=runtime_config.qdrant_collection):
         return
 
     client.create_collection(
         collection_name=runtime_config.qdrant_collection,
-        vectors_config=models.VectorParams(size=VECTOR_SIZE, distance=models.Distance.COSINE),
+        vectors_config=models.VectorParams(
+            size=VECTOR_SIZE, distance=models.Distance.COSINE
+        ),
     )
     logger.info("Qdrant 컬렉션 생성 완료: %s", runtime_config.qdrant_collection)
 
@@ -53,7 +57,9 @@ def _build_context_text(row) -> str:
 
 def process_partition(iterator, runtime_config: SparkRuntimeConfig):
     model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    client = QdrantClient(host=runtime_config.qdrant_host, port=runtime_config.qdrant_port)
+    client = QdrantClient(
+        host=runtime_config.qdrant_host, port=runtime_config.qdrant_port
+    )
 
     points = []
     for row in iterator:
@@ -73,7 +79,9 @@ def process_partition(iterator, runtime_config: SparkRuntimeConfig):
             "full_text": context_text,
         }
 
-        points.append(models.PointStruct(id=row.id, vector=embedding_vector, payload=payload))
+        points.append(
+            models.PointStruct(id=row.id, vector=embedding_vector, payload=payload)
+        )
 
     if points:
         client.upsert(collection_name=runtime_config.qdrant_collection, points=points)

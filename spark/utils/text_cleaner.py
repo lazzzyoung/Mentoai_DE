@@ -30,7 +30,9 @@ RAW_DATA_SCHEMA = StructType(
         StructField("annual_from", IntegerType()),
         StructField("annual_to", IntegerType()),
         StructField("due_time", StringType()),
-        StructField("address", StructType([StructField("full_location", StringType())])),
+        StructField(
+            "address", StructType([StructField("full_location", StringType())])
+        ),
         StructField("detail", DETAIL_SCHEMA),
         StructField("company", StructType([StructField("name", StringType())])),
         StructField("skill_tags", ArrayType(StringType())),
@@ -45,9 +47,12 @@ OUTER_SCHEMA = StructType(
     ]
 )
 
+
 def clean_job_details(raw_df):
     # JSON 전체 파싱
-    parsed_df = raw_df.select(from_json(col("value"), OUTER_SCHEMA).alias("data")).select("data.*")
+    parsed_df = raw_df.select(
+        from_json(col("value"), OUTER_SCHEMA).alias("data")
+    ).select("data.*")
 
     # 필드 추출 및 가공
     flattened_df = parsed_df.select(
@@ -73,5 +78,5 @@ def clean_job_details(raw_df):
 
     # 날짜 변환 및 중복 제거
     cleaned_df = flattened_df.withColumn("collected_date", to_date(col("collected_at")))
-    
+
     return cleaned_df.dropDuplicates(["id"])

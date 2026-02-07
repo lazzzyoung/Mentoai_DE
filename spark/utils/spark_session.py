@@ -20,12 +20,17 @@ def create_spark_session(
         .master(master)
         .config("spark.jars.packages", ",".join(packages))
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.endpoint", f"s3.{runtime_config.aws_region}.amazonaws.com")
+        .config(
+            "spark.hadoop.fs.s3a.endpoint",
+            f"s3.{runtime_config.aws_region}.amazonaws.com",
+        )
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
     )
 
     if runtime_config.aws_access_key_id:
-        builder = builder.config("spark.hadoop.fs.s3a.access.key", runtime_config.aws_access_key_id)
+        builder = builder.config(
+            "spark.hadoop.fs.s3a.access.key", runtime_config.aws_access_key_id
+        )
     if runtime_config.aws_secret_access_key:
         builder = builder.config(
             "spark.hadoop.fs.s3a.secret.key", runtime_config.aws_secret_access_key

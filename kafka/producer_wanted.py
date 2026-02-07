@@ -26,14 +26,18 @@ WANTED_LIMIT = int(os.getenv("WANTED_LIMIT", "50"))
 def _create_producer() -> KafkaProducer:
     return KafkaProducer(
         bootstrap_servers=[BOOTSTRAP_SERVERS],
-        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode(
+            "utf-8"
+        ),
         key_serializer=lambda value: str(value).encode("utf-8"),
         retries=3,
     )
 
 
 def run_producer() -> None:
-    logger.info("Wanted producer 시작 | bootstrap=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC_NAME)
+    logger.info(
+        "Wanted producer 시작 | bootstrap=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC_NAME
+    )
 
     try:
         producer = _create_producer()

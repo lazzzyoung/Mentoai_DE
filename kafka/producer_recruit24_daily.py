@@ -22,7 +22,9 @@ MAX_JOBS_PER_RUN = int(os.getenv("RECRUIT24_DAILY_LIMIT", "50"))
 def _create_producer() -> KafkaProducer:
     return KafkaProducer(
         bootstrap_servers=[BOOTSTRAP_SERVERS],
-        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode(
+            "utf-8"
+        ),
     )
 
 

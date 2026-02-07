@@ -15,7 +15,9 @@ def recommend_jobs_list(
     return service.recommend_jobs_list(user_id)
 
 
-@router.post("/jobs/{job_id}/analyze/{user_id}", response_model=DetailedAnalysisResponse)
+@router.post(
+    "/jobs/{job_id}/analyze/{user_id}", response_model=DetailedAnalysisResponse
+)
 def analyze_job_detail(
     job_id: int,
     user_id: int,
