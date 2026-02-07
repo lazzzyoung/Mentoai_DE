@@ -16,8 +16,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-TOPIC_NAME = os.getenv("KAFKA_BACKFILL_TOPIC", "career_backfill")
 BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
+
+def resolve_topic_name() -> str:
+    return os.getenv("KAFKA_BACKFILL_TOPIC") or os.getenv(
+        "KAFKA_TOPIC_NAME", "career_raw"
+    )
+
+
+TOPIC_NAME = resolve_topic_name()
 
 
 def _create_producer() -> KafkaProducer:

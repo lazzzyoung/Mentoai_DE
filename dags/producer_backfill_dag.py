@@ -26,6 +26,7 @@ with DAG(
         task_id="run_backfill_producer",
         bash_command=(
             "export KAFKA_BOOTSTRAP_SERVERS='kafka:29092' && "
+            "export KAFKA_TOPIC_NAME='career_raw' && "
             "export PYTHONPATH=$PYTHONPATH:/opt/airflow && "
             "python3 /opt/airflow/kafka/producer_recruit24_backfill.py "
             "{{ dag_run.conf.get('start_page', 1) }} "

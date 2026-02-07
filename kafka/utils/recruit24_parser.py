@@ -72,6 +72,7 @@ def build_job_message(
     auth_no = parsed_row["auth_no"]
 
     return {
+        "source": "recruit24",
         "source_id": auth_no,
         "company": parsed_row["company"],
         "title": parsed_row["title"],

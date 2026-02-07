@@ -1,4 +1,15 @@
-from pyspark.sql.functions import coalesce, col, from_json, lit, to_date
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import (
+    coalesce,
+    col,
+    concat_ws,
+    from_json,
+    lit,
+    regexp_extract,
+    to_date,
+    when,
+    xxhash64,
+)
 from pyspark.sql.types import (
     ArrayType,
     BooleanType,
@@ -42,32 +53,79 @@ RAW_DATA_SCHEMA = StructType(
 OUTER_SCHEMA = StructType(
     [
         StructField("source", StringType()),
+        StructField("source_id", StringType()),
         StructField("collected_at", StringType()),
         StructField("raw_data", RAW_DATA_SCHEMA),
+        StructField("company", StringType()),
+        StructField("title", StringType()),
+        StructField("location", StringType()),
+        StructField("description", StringType()),
+        StructField("requirements", StringType()),
+        StructField("preferred_qualifications", StringType()),
+        StructField("deadline", StringType()),
+        StructField("reg_date", StringType()),
+        StructField("link", StringType()),
+        StructField("pay", StringType()),
     ]
 )
 
 
-def clean_job_details(raw_df):
-    # JSON 전체 파싱
+def clean_job_details(raw_df: DataFrame) -> DataFrame:
     parsed_df = raw_df.select(
         from_json(col("value"), OUTER_SCHEMA).alias("data")
     ).select("data.*")
 
-    # 필드 추출 및 가공
+    source_col = coalesce(
+        col("source"),
+        when(col("raw_data").isNotNull(), lit("wanted")),
+        lit("recruit24"),
+    )
+    source_id_col = coalesce(col("source_id"), col("raw_data.id").cast("string"))
+    extracted_numeric_id = regexp_extract(
+        coalesce(source_id_col, lit("")), r"(\d+)", 1
+    ).cast("long")
+    fallback_hash_id = xxhash64(
+        coalesce(source_id_col, lit("")),
+        coalesce(col("title"), lit("")),
+        coalesce(col("company"), lit("")),
+        coalesce(col("collected_at"), lit("")),
+    )
+
     flattened_df = parsed_df.select(
-        col("raw_data.id").alias("id"),
-        col("raw_data.status").alias("status"),
-        col("raw_data.company.name").alias("company"),
-        col("raw_data.address.full_location").alias("location"),
-        col("raw_data.detail.position").alias("position"),
-        col("raw_data.detail.intro").alias("intro"),
-        col("raw_data.detail.main_tasks").alias("main_tasks"),
-        col("raw_data.detail.requirements").alias("requirements"),
-        col("raw_data.detail.preferred_points").alias("preferred_points"),
-        col("raw_data.detail.benefits").alias("benefits"),
-        col("raw_data.detail.hire_rounds").alias("hire_rounds"),
-        coalesce(col("raw_data.due_time"), lit("상시채용")).alias("due_time"),
+        coalesce(
+            col("raw_data.id").cast("long"), extracted_numeric_id, fallback_hash_id
+        ).alias("id"),
+        source_col.alias("source"),
+        source_id_col.alias("source_id"),
+        coalesce(col("raw_data.status"), lit("active")).alias("status"),
+        coalesce(col("raw_data.company.name"), col("company"), lit("N/A")).alias(
+            "company"
+        ),
+        coalesce(
+            col("raw_data.address.full_location"), col("location"), lit("지역 미상")
+        ).alias("location"),
+        coalesce(col("raw_data.detail.position"), col("title"), lit("N/A")).alias(
+            "position"
+        ),
+        coalesce(col("raw_data.detail.intro"), col("description"), lit("")).alias(
+            "intro"
+        ),
+        coalesce(col("raw_data.detail.main_tasks"), col("description"), lit("")).alias(
+            "main_tasks"
+        ),
+        coalesce(
+            col("raw_data.detail.requirements"), col("requirements"), lit("")
+        ).alias("requirements"),
+        coalesce(
+            col("raw_data.detail.preferred_points"),
+            col("preferred_qualifications"),
+            lit(""),
+        ).alias("preferred_points"),
+        coalesce(col("raw_data.detail.benefits"), lit("")).alias("benefits"),
+        coalesce(col("raw_data.detail.hire_rounds"), lit("")).alias("hire_rounds"),
+        coalesce(col("raw_data.due_time"), col("deadline"), lit("상시채용")).alias(
+            "due_time"
+        ),
         col("raw_data.is_newbie").alias("is_newbie"),
         col("raw_data.employment_type").alias("employment_type"),
         col("raw_data.annual_from").alias("annual_from"),
@@ -76,7 +134,20 @@ def clean_job_details(raw_df):
         col("collected_at"),
     )
 
-    # 날짜 변환 및 중복 제거
-    cleaned_df = flattened_df.withColumn("collected_date", to_date(col("collected_at")))
+    cleaned_df = (
+        flattened_df.withColumn("collected_date", to_date(col("collected_at")))
+        .withColumn(
+            "job_key",
+            coalesce(
+                when(
+                    col("source_id").isNotNull(),
+                    concat_ws(":", col("source"), col("source_id")),
+                ),
+                concat_ws(":", col("source"), col("id").cast("string")),
+            ),
+        )
+        .dropDuplicates(["job_key"])
+        .drop("job_key", "source", "source_id")
+    )
 
-    return cleaned_df.dropDuplicates(["id"])
+    return cleaned_df
