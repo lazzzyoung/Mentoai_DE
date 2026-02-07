@@ -1,6 +1,7 @@
 import logging
 
 from dotenv import load_dotenv
+from pyspark.sql.functions import col
 
 from utils.config import load_runtime_config
 from utils.spark_session import create_spark_session
@@ -11,6 +12,10 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _jdbc_properties(db_user: str, db_password: str) -> dict[str, str]:
+    return {"user": db_user, "password": db_password, "driver": "org.postgresql.Driver"}
 
 
 def run_recovery_silver() -> None:
@@ -32,17 +37,35 @@ def run_recovery_silver() -> None:
 
     input_df = raw_df.withColumnRenamed("raw_json", "value")
     refined_df = clean_job_details(input_df)
+    incremental_df = refined_df
 
-    record_count = refined_df.count()
-    logger.info("정제된 데이터 개수: %s", record_count)
+    try:
+        existing_ids_df = spark.read.jdbc(
+            url=runtime_config.db_url,
+            table="career_jobs",
+            properties=_jdbc_properties(
+                runtime_config.db_user,
+                runtime_config.db_password,
+            ),
+        ).select(col("id").alias("existing_id"))
+        incremental_df = refined_df.join(
+            existing_ids_df,
+            refined_df.id == existing_ids_df.existing_id,
+            "left_anti",
+        )
+    except Exception:
+        logger.info("기존 career_jobs 테이블이 없어 전체를 append합니다.")
+
+    record_count = incremental_df.count()
+    logger.info("적재 대상 데이터 개수: %s", record_count)
 
     write_batch_to_postgres(
-        df=refined_df,
+        df=incremental_df,
         db_url=runtime_config.db_url,
         db_user=runtime_config.db_user,
         db_password=runtime_config.db_password,
         db_table="career_jobs",
-        mode="overwrite",
+        mode="append",
     )
 
     spark.stop()
