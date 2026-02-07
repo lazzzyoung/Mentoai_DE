@@ -28,6 +28,7 @@ spark = [
     "qdrant-client>=1.9.0",
     "sentence-transformers",
     "torch",
+    "pyspark",
 ]
 server = [
     "python-dotenv",
@@ -45,13 +46,27 @@ server = [
     "langchain-huggingface",
     "sentence-transformers",
 ]
+runtime = [
+    { include-group = "airflow" },
+    { include-group = "spark" },
+    { include-group = "server" },
+]
 dev = [
+    { include-group = "runtime" },
     "pytest",
     "ruff",
     "poethepoet",
+    "ty>=0.0.15",
 ]
 
+[tool.ruff]
+extend-exclude = [".venv"]
+
 [tool.poe.tasks]
-lint = "ruff check ."
-lint_fix = "ruff check . --fix"
-format = "ruff format ."
+lint = "ruff check --exclude .venv ."
+lint_fix = "ruff check --exclude .venv --fix ."
+format = "ruff format --exclude .venv ."
+type = "ty check --exclude .venv ."
+
+[tool.ty.src]
+exclude = [".venv/**"]
