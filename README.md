@@ -160,6 +160,14 @@ DB_PASSWORD=airflow
 
 DATABASE_URL=postgresql://airflow:airflow@postgres:5432/mentoai
 QDRANT_HOST=mentoai-qdrant
+
+# Airflow 보안 설정
+AIRFLOW__WEBSERVER__SECRET_KEY=replace_with_secure_random_string
+AIRFLOW_ADMIN_USERNAME=admin
+AIRFLOW_ADMIN_PASSWORD=replace_with_strong_password
+AIRFLOW_ADMIN_FIRSTNAME=Admin
+AIRFLOW_ADMIN_LASTNAME=User
+AIRFLOW_ADMIN_EMAIL=admin@example.com
 ```
 
 ### 2) 인프라 실행
@@ -212,7 +220,7 @@ INSERT INTO user_specs (
 ### 4) Airflow에서 파이프라인 실행
 
 1. 브라우저에서 `http://localhost:8081` 접속
-2. `admin / admin` 로그인
+2. `.env`의 `AIRFLOW_ADMIN_USERNAME / AIRFLOW_ADMIN_PASSWORD`로 로그인
 3. `mentoai_pipeline` DAG를 Unpause
 4. Trigger 실행 후 `run_kafka_producer -> spark_ingest_bronze -> spark_process_silver -> spark_upsert_gold` 성공 확인
 

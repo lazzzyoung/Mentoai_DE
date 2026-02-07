@@ -3,7 +3,7 @@ version: "3.8"
 services:
   
   zookeeper:
-    image: zookeeper:latest
+    image: zookeeper:${ZOOKEEPER_IMAGE_TAG:-3.9.3}
     container_name: mentoai-zookeeper
     ports:
       - "2181:2181"
@@ -11,7 +11,7 @@ services:
 
   
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:${KAFKA_IMAGE_TAG:-3.8.1}
     container_name: mentoai-kafka
     ports:
       - "9092:9092"
@@ -28,7 +28,7 @@ services:
 
   
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:${KAFKA_UI_IMAGE_TAG:-v0.7.2}
     container_name: mentoai-kafka-ui
     ports:
       - "8080:8080"
@@ -96,7 +96,7 @@ services:
 
   
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:${QDRANT_IMAGE_TAG:-v1.13.6}
     container_name: mentoai-qdrant
     ports:
       - "6333:6333"   # Dashboard 및 REST API
@@ -118,7 +118,6 @@ services:
     env_file:
       - ../.env  
     environment:
-      - AIRFLOW__WEBSERVER__SECRET_KEY=my_very_secure_secret_key_12345
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
@@ -138,7 +137,6 @@ services:
     env_file:
       - ../.env
     environment:
-      - AIRFLOW__WEBSERVER__SECRET_KEY=my_very_secure_secret_key_12345
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
@@ -156,11 +154,18 @@ services:
     platform: linux/arm64
     depends_on:
       - postgres
+    env_file:
+      - ../.env
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/mentoai
     command: >
       bash -c "airflow db init && 
-      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+      airflow users create --username $${AIRFLOW_ADMIN_USERNAME:?AIRFLOW_ADMIN_USERNAME is required}
+      --password $${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD is required}
+      --firstname $${AIRFLOW_ADMIN_FIRSTNAME:-Admin}
+      --lastname $${AIRFLOW_ADMIN_LASTNAME:-User}
+      --role Admin
+      --email $${AIRFLOW_ADMIN_EMAIL:-admin@example.com}"
 
 
   ai-server:

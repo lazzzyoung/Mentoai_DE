@@ -17,4 +17,4 @@ RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingF
 COPY server/ ./server/
 
 # FastAPI 실행 (server.app.main 모듈 실행)
-CMD ["uvicorn", "server.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "server.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
