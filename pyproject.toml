@@ -3,18 +3,19 @@ name = "mentoai-de"
 version = "0.1.0"
 description = "MentoAI data engineering and RAG backend"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
 airflow = [
+    "apache-airflow==2.8.1",
     "pendulum",
     "python-dotenv",
     "requests",
     "beautifulsoup4",
     "kafka-python",
-    "apache-airflow-providers-docker",
-    "apache-airflow-providers-slack",
+    "apache-airflow-providers-docker==3.14.1",
+    "apache-airflow-providers-slack==8.9.2",
     "psycopg2-binary",
     "boto3",
     "qdrant-client>=1.9.0",

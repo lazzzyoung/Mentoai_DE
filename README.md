@@ -103,7 +103,7 @@ Mentoai_DE/
 
 - Docker / Docker Compose
 - `uv` (Python 의존성/실행 관리)
-- Python 3.10+ (로컬 스크립트 직접 실행 시)
+- Python 3.11+ (로컬 스크립트 직접 실행 시)
 - 필수 키/접근 정보
   - Google Gemini API Key
   - AWS S3 Access Key
