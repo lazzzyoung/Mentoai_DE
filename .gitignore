@@ -55,6 +55,7 @@ Temporary Items
 
 # --- Data & Logs (Project Specific) ---
 *.log
+logs/
 data/
 infra/postgres_data/
 infra/qdrant_storage/
@@ -62,3 +63,7 @@ infra/qdrant_storage/
 # Spark 체크포인트 (로컬 실행 시 생성됨)
 spark-warehouse/
 checkpoints/
+
+
+*.pptx
+*.pdf
