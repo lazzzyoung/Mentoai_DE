@@ -1,0 +1,69 @@
+name: 버그 리포트
+description: 재현 가능한 버그 또는 회귀를 제보합니다
+title: "[버그] "
+labels:
+  - "type:bug"
+  - "needs-triage"
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 요약
+      description: 무엇이 동작하지 않나요? 짧고 구체적으로 작성해주세요.
+      placeholder: "예: 소셜 로그인 시 500 에러가 발생합니다."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: 재현 절차
+      description: 빠르게 재현할 수 있도록 정확한 절차를 작성해주세요.
+      placeholder: |
+        1. ... 페이지로 이동
+        2. ... 버튼 클릭
+        3. ... 현상 확인
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: 기대 동작
+      placeholder: "정상이라면 어떻게 동작해야 하나요?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: 실제 동작
+      placeholder: "실제로는 어떤 일이 발생했나요?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      description: 미해결 시 비즈니스 영향도를 선택해주세요.
+      options:
+        - "S1 - 치명적 (서비스 장애, 데이터 손실, 보안 이슈)"
+        - "S2 - 높음 (핵심 기능 사용 불가)"
+        - "S3 - 보통 (우회 방법 존재)"
+        - "S4 - 낮음 (경미한 문제)"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 환경 정보
+      description: 브라우저, OS, 앱 버전, 커밋 해시 등을 입력해주세요.
+      placeholder: "Chrome 123 / macOS 14.4 / app v1.2.3"
+
+  - type: textarea
+    id: logs_and_screenshots
+    attributes:
+      label: 로그 및 스크린샷
+      description: 가능하면 스택 트레이스, 로그, 스크린샷, 영상 등을 첨부해주세요.

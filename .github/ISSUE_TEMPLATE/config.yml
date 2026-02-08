@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 보안 제보
+    url: https://github.com/lazzzyoung/Mentoai_DE/security/policy
+    about: 보안 취약점은 공개 이슈가 아닌 비공개 보안 제보 경로로 접수해주세요.
