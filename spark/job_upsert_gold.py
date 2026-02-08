@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from dotenv import load_dotenv
 from pyspark.sql.functions import coalesce, col, lit
@@ -81,6 +81,11 @@ def process_partition(iterator, runtime_config: SparkRuntimeConfig):
             "intro": row.intro,
             "hire_rounds": row.hire_rounds,
             "full_text": context_text,
+            "metadata": {
+                "id": row.id,
+                "company": row.company,
+                "position": row.position,
+            },
         }
 
         points.append(
@@ -122,7 +127,7 @@ def run_upsert_gold() -> None:
     init_qdrant_collection(runtime_config)
 
     logger.info("Embedding 및 Qdrant upsert를 시작합니다.")
-    target_rdd = cast("RDD[Any]", target_df.rdd)
+    target_rdd = cast("RDD[object]", target_df.rdd)
     partition_counts = target_rdd.mapPartitions(
         lambda it: process_partition(it, runtime_config)
     ).collect()

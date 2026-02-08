@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from typing import Final
 
@@ -64,5 +63,4 @@ async def read_profile(request: Request, hx_request: str | None = Header(default
 @router.post("/api/action", response_class=HTMLResponse)
 @router.post("/api/web/action", response_class=HTMLResponse, include_in_schema=False)
 async def handle_htmx_action():
-    await asyncio.sleep(1)
     return HTMLResponse(content=ACTION_SUCCESS_PARTIAL)

@@ -191,6 +191,17 @@ class RAGService:
             ]
         )
 
+    @staticmethod
+    def _format_jobs_context(jobs_context: list[JobContext], content_limit: int) -> str:
+        return "\n".join(
+            [
+                f"기업: {job['company']}\n"
+                f"제목: {job['title']}\n"
+                f"내용: {job['content'][:content_limit]}"
+                for job in jobs_context
+            ]
+        )
+
     def _fetch_job_payload(self, doc_id: int) -> dict[str, Any] | None:
         try:
             points = self.client.retrieve(
@@ -226,7 +237,7 @@ class RAGService:
             title = str(doc.metadata.get("position") or "미상")
             content = doc.page_content
 
-            if doc_id is not None:
+            if doc_id is not None and (company == "미상" or title == "미상"):
                 payload = self._fetch_job_payload(doc_id)
                 if payload:
                     company = str(payload.get("company") or company)
@@ -293,11 +304,17 @@ class RAGService:
             parser = JsonOutputParser(pydantic_object=AnalysisResult)
             prompt = ChatPromptTemplate.from_template(ROADMAP_PROMPT)
             chain = prompt | self.llm | parser
+            jobs_context = await run_in_threadpool(
+                self._build_jobs_context,
+                retrieved_docs,
+            )
             parsed_result = await run_in_threadpool(
                 chain.invoke,
                 {
                     "user_specs": user_query_text,
-                    "context": self._format_docs(retrieved_docs, content_limit=500),
+                    "context": self._format_jobs_context(
+                        jobs_context, content_limit=500
+                    ),
                     "format_instructions": parser.get_format_instructions(),
                 },
             )
@@ -306,11 +323,11 @@ class RAGService:
 
             recommended_jobs = [
                 JobRecommendation(
-                    id=self._normalize_doc_id(doc) or 0,
-                    company=str(doc.metadata.get("company") or "미상"),
-                    title=str(doc.metadata.get("position") or "미상"),
+                    id=job["job_id"],
+                    company=job["company"],
+                    title=job["title"],
                 )
-                for doc in retrieved_docs
+                for job in jobs_context
             ]
 
             return RoadmapResponse(

@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 
 from server.app.core.config import get_settings
 from server.app.db.session import normalize_database_url
-from server.app.models import User, UserSpec  # noqa: F401
+from server.app import models as _models  # noqa: F401
 
 config = context.config
 

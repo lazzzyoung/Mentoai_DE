@@ -18,6 +18,15 @@ def _jdbc_properties(db_user: str, db_password: str) -> dict[str, str]:
     return {"user": db_user, "password": db_password, "driver": "org.postgresql.Driver"}
 
 
+def _is_missing_career_jobs_table_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "career_jobs" in message and (
+        "does not exist" in message
+        or "table or view not found" in message
+        or "undefinedtable" in message
+    )
+
+
 def run_recovery_silver() -> None:
     runtime_config = load_runtime_config()
     if not runtime_config.s3_bucket_name:
@@ -53,11 +62,13 @@ def run_recovery_silver() -> None:
             refined_df.id == existing_ids_df.existing_id,
             "left_anti",
         )
-    except Exception:
-        logger.info("기존 career_jobs 테이블이 없어 전체를 append합니다.")
-
-    record_count = incremental_df.count()
-    logger.info("적재 대상 데이터 개수: %s", record_count)
+    except Exception as exc:
+        if _is_missing_career_jobs_table_error(exc):
+            logger.info("기존 career_jobs 테이블이 없어 전체를 append합니다.")
+        else:
+            logger.exception("기존 career_jobs 로드 실패로 작업을 중단합니다.")
+            spark.stop()
+            raise
 
     write_batch_to_postgres(
         df=incremental_df,
