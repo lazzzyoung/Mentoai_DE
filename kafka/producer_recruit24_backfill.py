@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 from kafka import KafkaProducer
 
 from utils.recruit24_parser import build_job_message, parse_list_row
-from utils.recruit24_scraper import fetch_job_list, get_detail_info
 
 load_dotenv()
 
@@ -40,6 +39,8 @@ def _create_producer() -> KafkaProducer:
 
 
 def _process_page(producer: KafkaProducer, page: int, end_page: int) -> int:
+    from utils.recruit24_scraper import fetch_job_list, get_detail_info
+
     rows = fetch_job_list(page_index=page)
     if not rows:
         logger.warning("[Page %s/%s] 로딩 실패 또는 데이터 없음", page, end_page)
