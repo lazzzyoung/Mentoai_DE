@@ -3,7 +3,7 @@ name = "mentoai-de"
 version = "0.1.0"
 description = "MentoAI data engineering and RAG backend"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = []
 
 [dependency-groups]
@@ -34,8 +34,10 @@ server = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
-    "psycopg2-binary",
     "sqlalchemy",
+    "sqlmodel",
+    "asyncpg",
+    "alembic",
     "pydantic",
     "langchain",
     "langchain-core",
@@ -47,7 +49,6 @@ server = [
     "sentence-transformers",
 ]
 runtime = [
-    { include-group = "airflow" },
     { include-group = "spark" },
     { include-group = "server" },
 ]
@@ -57,6 +58,14 @@ dev = [
     "ruff",
     "poethepoet",
     "ty>=0.0.15",
+]
+
+[tool.uv]
+conflicts = [
+    [
+        { group = "airflow" },
+        { group = "server" },
+    ],
 ]
 
 [tool.ruff]
@@ -78,6 +87,8 @@ sync_server = "uv sync --group server"
 sync_dev = "uv sync --group dev"
 setup_env = "cp -n .env.example .env || true"
 api_dev = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"
+db_migrate = "alembic upgrade head"
+db_revision = "alembic revision --autogenerate -m 'schema update'"
 producer_wanted = "python kafka/producer_wanted.py"
 producer_daily = "python kafka/producer_recruit24_daily.py"
 producer_backfill = "python kafka/producer_recruit24_backfill.py 1 3"

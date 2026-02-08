@@ -57,6 +57,7 @@ User <-> FastAPI (RAG) <-> Qdrant
 | Storage (Silver) | PostgreSQL 13 | 정제 데이터 저장 |
 | Storage (Gold) | Qdrant 1.13 | 벡터 검색 인덱스 |
 | API | FastAPI + Uvicorn | RAG API 제공 |
+| ORM | SQLModel + SQLAlchemy AsyncSession + `asyncpg` | 서버 비동기 DB 접근 |
 | LLM / RAG | Gemini (`langchain-google-genai`), LangChain | 추천/분석 응답 생성 |
 | Embedding | `BM-K/KoSimCSE-roberta-multitask` | 공고/질의 벡터화 |
 | Package/Run | `uv` | 의존성 그룹 관리(`airflow`, `spark`, `server`, `dev`) |
@@ -92,7 +93,7 @@ Mentoai_DE/
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-개발용 의존성(테스트/poe 포함) 설치:
+개발용 의존성(서버/Spark + 테스트/poe 포함) 설치:
 
 ```bash
 uv sync --group dev
@@ -120,7 +121,7 @@ cp .env.example .env
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | Docker 네트워크 기준 |
 | `KAFKA_TOPIC_NAME` | `career_raw` | 수집 토픽 |
 | `DB_URL` | `jdbc:postgresql://postgres:5432/mentoai` | Spark JDBC |
-| `DATABASE_URL` | `postgresql://airflow:airflow@postgres:5432/mentoai` | FastAPI DB |
+| `DATABASE_URL` | `postgresql://airflow:airflow@postgres:5432/mentoai` | FastAPI DB (`postgresql://` 입력 시 내부에서 `postgresql+asyncpg://`로 자동 변환) |
 | `QDRANT_HOST` | `mentoai-qdrant` | Docker 컨테이너명 |
 | `QDRANT_COLLECTION_NAME` | `career_jobs` | Gold 컬렉션명 |
 
@@ -148,6 +149,12 @@ uv run poe infra_up
 - Qdrant API: `http://localhost:6333`
 
 ## Quick Start (End-to-End)
+
+### 0) (Optional) Run DB migration
+
+```bash
+uv run poe db_migrate
+```
 
 ### 1) Seed user tables
 
@@ -237,7 +244,7 @@ uv sync --group spark
 # Airflow/DAG 개발용
 uv sync --group airflow
 
-# 테스트/정적 분석 포함 전체 개발 환경
+# 서버/Spark + 테스트/정적 분석 개발 환경
 uv sync --group dev
 ```
 
@@ -257,6 +264,8 @@ uv run poe <task_name>
 | Setup | `sync_server` | API 개발용 의존성 설치 |
 | Setup | `sync_spark` | Spark 스크립트 의존성 설치 |
 | Setup | `sync_airflow` | Airflow/DAG 의존성 설치 |
+| DB | `db_migrate` | Alembic 마이그레이션 적용(`upgrade head`) |
+| DB | `db_revision` | Alembic 리비전 생성(autogenerate) |
 | Infra | `infra_up` | `infra/docker-compose.yml` 전체 기동 |
 | Infra | `infra_down` | 인프라 종료/정리 |
 | Infra | `infra_restart` | 인프라 재시작 |
@@ -277,7 +286,7 @@ uv run poe <task_name>
 
 ### Run FastAPI locally (without docker ai-server)
 
-로컬에서 API만 단독 실행할 경우 `.env`의 `DATABASE_URL`, `QDRANT_HOST`를 로컬 주소로 바꿔야 합니다.
+로컬에서 API만 단독 실행할 경우 `.env`의 `DATABASE_URL`, `QDRANT_HOST`를 로컬 주소로 바꿔야 합니다. (`DATABASE_URL`은 `postgresql://` 또는 `postgresql+asyncpg://` 모두 허용)
 
 예시:
 

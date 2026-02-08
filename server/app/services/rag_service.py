@@ -14,6 +14,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from server.app.core.config import Settings
 from server.app.repositories.user_repository import UserRepository
@@ -119,7 +120,6 @@ class DetailedAnalysisPayload(BaseModel):
 class RAGService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.user_repository = UserRepository(settings.database_url)
 
         logger.info("Loading Embedding Model...")
         embeddings = HuggingFaceEmbeddings(
@@ -151,8 +151,9 @@ class RAGService:
             },
         )
 
-    def _fetch_user_info(self, user_id: int) -> UserInfo:
-        user_info = self.user_repository.fetch_user_profile(user_id)
+    async def _fetch_user_info(self, user_id: int, session: AsyncSession) -> UserInfo:
+        user_repository = UserRepository(session)
+        user_info = await user_repository.fetch_user_profile(user_id)
         if not user_info:
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -241,8 +242,13 @@ class RAGService:
             )
         return context
 
-    def get_user_specs(self, user_id: int) -> dict[str, Any]:
-        user_specs = self.user_repository.fetch_user_specs(user_id)
+    async def get_user_specs(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> dict[str, Any]:
+        user_repository = UserRepository(session)
+        user_specs = await user_repository.fetch_user_specs(user_id)
         if not user_specs:
             raise HTTPException(status_code=404, detail="User not found")
         return user_specs
@@ -257,9 +263,13 @@ class RAGService:
                 status_code=500, detail="Gemini connection failed"
             ) from exc
 
-    def generate_career_roadmap_v1(self, user_id: int) -> RoadmapResponseV1:
+    async def generate_career_roadmap_v1(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> RoadmapResponseV1:
         try:
-            user_info = self._fetch_user_info(user_id)
+            user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
             retrieved_docs = self._similarity_search(user_query_text, limit=3)
@@ -296,9 +306,13 @@ class RAGService:
                 status_code=500, detail="V1 roadmap generation failed"
             ) from exc
 
-    def generate_career_roadmap_v2(self, user_id: int) -> RoadmapResponseV2:
+    async def generate_career_roadmap_v2(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> RoadmapResponseV2:
         try:
-            user_info = self._fetch_user_info(user_id)
+            user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
             retrieved_docs = self._similarity_search(user_query_text, limit=3)
@@ -349,9 +363,13 @@ class RAGService:
                 status_code=500, detail="V2 roadmap generation failed"
             ) from exc
 
-    def recommend_jobs_list(self, user_id: int) -> RecommendationListResponse:
+    async def recommend_jobs_list(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> RecommendationListResponse:
         try:
-            user_info = self._fetch_user_info(user_id)
+            user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(
                 user_info, include_career=True
             )
@@ -387,9 +405,14 @@ class RAGService:
                 status_code=500, detail="Job recommendation failed"
             ) from exc
 
-    def analyze_job_detail(self, job_id: int, user_id: int) -> DetailedAnalysisResponse:
+    async def analyze_job_detail(
+        self,
+        job_id: int,
+        user_id: int,
+        session: AsyncSession,
+    ) -> DetailedAnalysisResponse:
         try:
-            user_info = self._fetch_user_info(user_id)
+            user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
             payload = self._fetch_job_payload(job_id)
