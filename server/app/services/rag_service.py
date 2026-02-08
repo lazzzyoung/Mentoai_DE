@@ -15,6 +15,7 @@ from langchain_qdrant import QdrantVectorStore
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from server.app.core.config import Settings
 from server.app.repositories.user_repository import UserRepository
@@ -253,9 +254,9 @@ class RAGService:
             raise HTTPException(status_code=404, detail="User not found")
         return user_specs
 
-    def test_gemini_connection(self, prompt: str = "안녕") -> dict[str, str]:
+    async def test_gemini_connection(self, prompt: str = "안녕") -> dict[str, str]:
         try:
-            response = self.llm.invoke(prompt)
+            response = await run_in_threadpool(self.llm.invoke, prompt)
             return {"gemini_response": str(response.content)}
         except Exception as exc:
             logger.error("Gemini 연결 테스트 실패: %s", exc)
@@ -272,7 +273,11 @@ class RAGService:
             user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
-            retrieved_docs = self._similarity_search(user_query_text, limit=3)
+            retrieved_docs = await run_in_threadpool(
+                self._similarity_search,
+                user_query_text,
+                3,
+            )
             if not retrieved_docs:
                 return RoadmapResponseV1(
                     user_name=user_info["username"],
@@ -282,11 +287,12 @@ class RAGService:
 
             prompt = ChatPromptTemplate.from_template(ROADMAP_V1_PROMPT)
             chain = prompt | self.llm | StrOutputParser()
-            analysis_result = chain.invoke(
+            analysis_result = await run_in_threadpool(
+                chain.invoke,
                 {
                     "user_specs": user_query_text,
                     "context": self._format_docs(retrieved_docs, content_limit=300),
-                }
+                },
             )
 
             recommended_jobs = [
@@ -315,7 +321,11 @@ class RAGService:
             user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
-            retrieved_docs = self._similarity_search(user_query_text, limit=3)
+            retrieved_docs = await run_in_threadpool(
+                self._similarity_search,
+                user_query_text,
+                3,
+            )
             if not retrieved_docs:
                 return RoadmapResponseV2(
                     user_name=user_info["username"],
@@ -331,12 +341,13 @@ class RAGService:
             parser = JsonOutputParser(pydantic_object=AnalysisResultV2)
             prompt = ChatPromptTemplate.from_template(ROADMAP_V2_PROMPT)
             chain = prompt | self.llm | parser
-            parsed_result = chain.invoke(
+            parsed_result = await run_in_threadpool(
+                chain.invoke,
                 {
                     "user_specs": user_query_text,
                     "context": self._format_docs(retrieved_docs, content_limit=500),
                     "format_instructions": parser.get_format_instructions(),
-                }
+                },
             )
 
             analysis_result = AnalysisResultV2.model_validate(parsed_result)
@@ -374,7 +385,11 @@ class RAGService:
                 user_info, include_career=True
             )
 
-            retrieved_docs = self._similarity_search(user_query_text, limit=5)
+            retrieved_docs = await run_in_threadpool(
+                self._similarity_search,
+                user_query_text,
+                5,
+            )
             if not retrieved_docs:
                 return RecommendationListResponse(
                     user_name=user_info["username"], recommendations=[]
@@ -384,12 +399,17 @@ class RAGService:
             prompt = ChatPromptTemplate.from_template(RECOMMENDATION_PROMPT)
             chain = prompt | self.llm | parser
 
-            parsed_result = chain.invoke(
+            jobs_context = await run_in_threadpool(
+                self._build_jobs_context,
+                retrieved_docs,
+            )
+            parsed_result = await run_in_threadpool(
+                chain.invoke,
                 {
                     "user_specs": user_query_text,
-                    "jobs_context": str(self._build_jobs_context(retrieved_docs)),
+                    "jobs_context": str(jobs_context),
                     "format_instructions": parser.get_format_instructions(),
-                }
+                },
             )
 
             validated_result = JobSummaryList.model_validate(parsed_result)
@@ -415,7 +435,7 @@ class RAGService:
             user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
 
-            payload = self._fetch_job_payload(job_id)
+            payload = await run_in_threadpool(self._fetch_job_payload, job_id)
             if not payload:
                 raise HTTPException(
                     status_code=404, detail="해당 공고를 찾을 수 없습니다."
@@ -428,14 +448,15 @@ class RAGService:
             parser = JsonOutputParser(pydantic_object=DetailedAnalysisPayload)
             prompt = ChatPromptTemplate.from_template(DETAIL_ANALYSIS_PROMPT)
             chain = prompt | self.llm | parser
-            parsed_result = chain.invoke(
+            parsed_result = await run_in_threadpool(
+                chain.invoke,
                 {
                     "user_specs": user_query_text,
                     "company": company,
                     "title": title,
                     "content": job_full_text,
                     "format_instructions": parser.get_format_instructions(),
-                }
+                },
             )
 
             detail = DetailedAnalysisPayload.model_validate(parsed_result)

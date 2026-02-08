@@ -15,7 +15,7 @@ async def test_gemini_connection(
     prompt: str = "안녕",
     service: RAGService = Depends(get_rag_service),
 ) -> dict[str, str]:
-    return service.test_gemini_connection(prompt)
+    return await service.test_gemini_connection(prompt)
 
 
 @router.get("/users/{user_id}/specs", response_model=UserSpecResponse)

@@ -34,6 +34,7 @@ server = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
+    "email-validator>=2",
     "sqlalchemy",
     "sqlmodel",
     "asyncpg",

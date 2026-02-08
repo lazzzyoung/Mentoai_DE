@@ -14,6 +14,9 @@ from server.app.core.config import get_settings
 def normalize_database_url(database_url: str) -> str:
     if database_url.startswith("postgresql+asyncpg://"):
         return database_url
+    if database_url.startswith("postgresql+"):
+        _, rest = database_url.split("://", 1)
+        return f"postgresql+asyncpg://{rest}"
     if database_url.startswith("postgresql://"):
         return database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     if database_url.startswith("postgres://"):

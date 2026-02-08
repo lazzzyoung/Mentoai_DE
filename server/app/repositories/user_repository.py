@@ -11,11 +11,7 @@ class UserRepository:
         self.session = session
 
     async def fetch_user_profile(self, user_id: int) -> dict[str, Any] | None:
-        query = (
-            select(UserSpec, User)
-            .join(User)
-            .where(UserSpec.user_id == user_id)
-        )
+        query = select(UserSpec, User).join(User).where(UserSpec.user_id == user_id)
         result = await self.session.exec(query)
         row = result.first()
         if row is None:
