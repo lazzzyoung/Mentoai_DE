@@ -1,185 +1,155 @@
-# MentoAI: Personalized AI Career Roadmap Service
+# MentoAI DE
 
-MentoAI는 사용자 스펙(희망 직무, 경력, 보유 기술)과 채용 공고를 비교 분석해 맞춤형 커리어 로드맵을 제공하는 RAG 기반 서비스입니다.  
-데이터 엔지니어링 파이프라인(Kafka, Spark, Airflow)과 벡터 검색(Qdrant), LLM(Gemini)을 결합해 추천 + 상세 컨설팅을 제공합니다.
+MentoAI는 사용자 스펙(희망 직무, 경력, 보유 기술)과 채용 공고를 비교 분석해 맞춤형 커리어 로드맵을 제공하는 서비스입니다.  
+이 저장소는 데이터 엔지니어링 파이프라인(Kafka, Spark, Airflow)과 RAG API(FastAPI, Qdrant, Gemini)를 함께 포함합니다.
+
+## 프로젝트 설명
+
+이 프로젝트는 "채용 공고 데이터 수집/정제 파이프라인"과 "사용자 맞춤 추천 API"를 하나로 연결한 엔드투엔드 시스템입니다.
+
+- 문제 정의
+채용 공고 원문은 소스마다 형식이 달라 바로 추천에 쓰기 어렵고, 사용자 스펙과의 정량 비교가 어렵습니다.
+- 해결 방식
+Airflow + Spark로 공고를 표준 스키마로 정제한 뒤, 임베딩/벡터 검색(Qdrant)과 LLM(Gemini)을 결합해 추천 점수와 액션 플랜을 생성합니다.
+- 이 저장소의 범위
+데이터 수집(Kafka producer), ETL(Bronze/Silver/Gold), 벡터 적재(Qdrant), FastAPI 기반 RAG API까지 포함합니다.
+- 기대 결과
+단순 키워드 매칭이 아니라, 사용자 경력/기술 대비 공고 적합도와 보완 학습 경로를 함께 제공합니다.
 
 ## System Architecture
 
 ```text
 [Data Ingestion]                       [Data Processing]
-Job Sites (Wanted 등) -> Kafka -> Spark ETL -> S3 (Bronze)
-                                             -> PostgreSQL (Silver)
-                                             -> Qdrant (Gold)
-                            ^ 
-                            |
-                        Airflow DAG
+Wanted / Work24 -> Kafka -> Spark ETL -> S3 (Bronze)
+                                       -> PostgreSQL (Silver)
+                                       -> Qdrant (Gold)
+                          ^
+                          |
+                      Airflow DAG
 
 [Service Layer]
 User <-> FastAPI (RAG) <-> Qdrant
-                      \-> Gemini (LLM)
+                    \-> Gemini (LLM)
 ```
 
 ## Key Features
 
 1. Automated ETL Pipeline
-- Airflow + Spark 기반으로 Bronze/Silver/Gold 파이프라인 자동화
-- `mentoai_pipeline` DAG에서 수집 -> 정제 -> 벡터 적재를 순차 실행
+- Airflow DAG로 수집 -> 정제 -> 벡터 적재를 자동 실행
+- `mentoai_pipeline`에서 `run_kafka_producer -> spark_ingest_bronze -> spark_process_silver -> spark_upsert_gold` 순서로 동작
 
-2. Semantic Search
-- `BM-K/KoSimCSE-roberta-multitask` 임베딩으로 공고 텍스트 벡터화
-- Qdrant 유사도 검색으로 문맥 기반 직무 매칭
+2. Unified Job Schema
+- Wanted / Work24 공고를 하나의 정규화 스키마로 통합
+- 중복 제거(`source:source_id` 기반) 후 Silver 적재
 
-3. RAG Career Consulting
-- Gemini 기반으로 추천 목록 점수화 + 상세 액션 플랜 생성
-- 단순 추천이 아닌 부족 역량 분석과 학습 가이드 제공
+3. Semantic Search + RAG
+- `BM-K/KoSimCSE-roberta-multitask` 임베딩으로 공고 벡터화
+- Qdrant 유사도 검색 + Gemini로 추천 점수/상세 분석 생성
 
-## Medallion Pipeline
+## Tech Stack
 
-1. Ingestion (Kafka)
-- `kafka/producer_wanted.py`가 채용 공고를 수집해 `career_raw` 토픽으로 전송
+| Layer | Stack | Purpose |
+| --- | --- | --- |
+| Orchestration | Apache Airflow 2.8 | DAG 스케줄링, 배치 파이프라인 오케스트레이션 |
+| Streaming | Apache Kafka 3.8 | 수집 데이터 이벤트 버퍼링 |
+| Processing | Apache Spark 3.5 (PySpark) | Bronze/Silver/Gold ETL |
+| Storage (Bronze) | AWS S3 (Parquet) | Raw 이벤트 적재 |
+| Storage (Silver) | PostgreSQL 13 | 정제 데이터 저장 |
+| Storage (Gold) | Qdrant 1.13 | 벡터 검색 인덱스 |
+| API | FastAPI + Uvicorn | RAG API 제공 |
+| LLM / RAG | Gemini (`langchain-google-genai`), LangChain | 추천/분석 응답 생성 |
+| Embedding | `BM-K/KoSimCSE-roberta-multitask` | 공고/질의 벡터화 |
+| Package/Run | `uv` | 의존성 그룹 관리(`airflow`, `spark`, `server`, `dev`) |
+| Infra | Docker Compose | 로컬 통합 실행 환경 |
 
-2. Bronze (S3)
-- `spark/job_ingest_bronze.py`가 Kafka raw 이벤트를 S3 Parquet로 저장
-
-3. Silver (PostgreSQL)
-- `spark/job_process_silver.py`가 raw 데이터를 정제해 `career_jobs` 테이블 적재
-
-4. Gold (Qdrant)
-- `spark/job_upsert_gold.py`가 임베딩을 생성해 Qdrant 컬렉션(`career_jobs`)에 upsert
-
-5. Service (FastAPI)
-- `server/app/main.py`가 추천/상세 분석 API 제공
-
-## Project Structure
+## Repository Structure
 
 ```text
 Mentoai_DE/
-├── pyproject.toml
-├── .python-version
-├── dags/
-│   ├── mentoai_pipeline.py
-│   ├── producer_daily_dag.py
-│   └── producer_backfill_dag.py
-├── kafka/
-│   ├── producer_wanted.py
-│   ├── producer_recruit24_daily.py
-│   ├── producer_recruit24_backfill.py
-│   └── utils/
-│       ├── wanted_scraper.py
-│       └── recruit24_scraper.py
-├── spark/
-│   ├── job_ingest_bronze.py
-│   ├── job_process_silver.py
-│   ├── job_upsert_gold.py
-│   └── utils/
-│       ├── spark_session.py
-│       ├── text_cleaner.py
-│       ├── readers.py
-│       └── writers.py
-├── server/
-│   └── app/
-│       └── main.py
-├── infra/
-│   ├── docker-compose.yml
-│   ├── airflow/
-│   ├── spark/
-│   └── server/
-└── README.md
+├── dags/                     # Airflow DAG
+├── kafka/                    # 채용 공고 수집 producer
+├── spark/                    # Bronze/Silver/Gold Spark jobs
+├── server/app/               # FastAPI + RAG 서비스
+├── tests/                    # pytest 테스트
+├── infra/                    # docker-compose 및 Dockerfile
+├── pyproject.toml            # uv dependency groups
+└── .env.example              # 환경 변수 템플릿
 ```
 
-## API Endpoints
+## Development Setup
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/` | 서버 헬스 체크 |
-| GET | `/api/v1/test/gemini` | Gemini 연결 테스트 |
-| GET | `/api/v1/users/{user_id}/specs` | 사용자 스펙 조회 |
-| POST | `/api/v1/curation/roadmap/{user_id}` | V1 로드맵 생성 |
-| POST | `/api/v2/curation/roadmap/{user_id}` | V2 구조화 로드맵 |
-| POST | `/api/v3/jobs/recommend/{user_id}` | 추천 공고 목록 + 점수 |
-| POST | `/api/v3/jobs/{job_id}/analyze/{user_id}` | 공고 상세 컨설팅 |
+### 1) Prerequisites
 
-## Prerequisites
+- Docker Desktop + Docker Compose v2
+- Python 3.11+
+- `uv` (dependency and task runner)
+- AWS S3 접근 키
+- Google Gemini API Key
 
-- Docker / Docker Compose
-- `uv` (Python 의존성/실행 관리)
-- Python 3.11+ (로컬 스크립트 직접 실행 시)
-- 필수 키/접근 정보
-  - Google Gemini API Key
-  - AWS S3 Access Key
-
-## Dependency Management (uv)
-
-이 프로젝트는 `requirements.txt` 대신 루트 `pyproject.toml`의 dependency group을 사용합니다.
-
-- `server`: FastAPI + LangChain + Qdrant
-- `spark`: Spark 보조 파이썬 의존성 + `torch`
-- `airflow`: DAG 실행 및 수집/연동 의존성
-- `dev`: 테스트/정적 분석용
-
-예시:
+`uv`가 없으면 설치:
 
 ```bash
-# lockfile 생성/갱신
-uv lock
-
-# server 개발 환경
-uv sync --group server
-
-# Spark 실행 스크립트용 환경
-uv sync --group spark
-
-# Airflow/DAG 로컬 실행용 환경
-uv sync --group airflow
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-## Quick Start
+개발용 의존성(테스트/poe 포함) 설치:
 
-### 1) `.env` 설정
-
-프로젝트 루트(`README.md`와 같은 위치)에 `.env` 파일을 생성하고 최소 항목을 채워주세요.
-
-```dotenv
-GOOGLE_API_KEY=your_gemini_key
-
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-AWS_REGION=ap-northeast-2
-S3_BUCKET_NAME=your_bucket_name
-
-KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-KAFKA_TOPIC_NAME=career_raw
-
-WANTED_BASE_URL=https://www.wanted.co.kr
-TARGET_JOB_GROUP=518
-TARGET_JOB_ID=655
-
-DB_URL=jdbc:postgresql://postgres:5432/mentoai
-DB_USER=airflow
-DB_PASSWORD=airflow
-
-DATABASE_URL=postgresql://airflow:airflow@postgres:5432/mentoai
-QDRANT_HOST=mentoai-qdrant
-
-# Airflow 보안 설정
-AIRFLOW__WEBSERVER__SECRET_KEY=replace_with_secure_random_string
-AIRFLOW_ADMIN_USERNAME=admin
-AIRFLOW_ADMIN_PASSWORD=replace_with_strong_password
-AIRFLOW_ADMIN_FIRSTNAME=Admin
-AIRFLOW_ADMIN_LASTNAME=User
-AIRFLOW_ADMIN_EMAIL=admin@example.com
+```bash
+uv sync --group dev
 ```
 
-### 2) 인프라 실행
+### 2) Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+필수 항목:
+
+| Variable | Description |
+| --- | --- |
+| `GOOGLE_API_KEY` | Gemini 호출 키 |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME` | Bronze 저장용 S3 접근 |
+| `AIRFLOW__WEBSERVER__SECRET_KEY` | Airflow 세션 보안 키 |
+| `AIRFLOW_ADMIN_USERNAME`, `AIRFLOW_ADMIN_PASSWORD` | Airflow 관리자 계정 |
+
+기본값이 있어도 환경에 맞춰 확인할 항목:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | Docker 네트워크 기준 |
+| `KAFKA_TOPIC_NAME` | `career_raw` | 수집 토픽 |
+| `DB_URL` | `jdbc:postgresql://postgres:5432/mentoai` | Spark JDBC |
+| `DATABASE_URL` | `postgresql://airflow:airflow@postgres:5432/mentoai` | FastAPI DB |
+| `QDRANT_HOST` | `mentoai-qdrant` | Docker 컨테이너명 |
+| `QDRANT_COLLECTION_NAME` | `career_jobs` | Gold 컬렉션명 |
+
+### 3) Start Infrastructure
+
+기본 방식:
 
 ```bash
 cd infra
 docker compose up -d --build
 ```
 
-`infra/*/Dockerfile`은 내부에서 `uv`로 group 의존성을 설치합니다.
+`poe` 단축 명령:
 
-### 3) 사용자 테이블/샘플 데이터 준비
+```bash
+uv run poe infra_up
+```
+
+주요 접속 주소:
+
+- Airflow: `http://localhost:8081`
+- FastAPI Swagger: `http://localhost:8000/docs`
+- Kafka UI: `http://localhost:8080`
+- Spark Master UI: `http://localhost:8082`
+- Qdrant API: `http://localhost:6333`
+
+## Quick Start (End-to-End)
+
+### 1) Seed user tables
 
 ```bash
 docker exec -it mentoai-postgres psql -U airflow -d mentoai
@@ -214,19 +184,22 @@ INSERT INTO user_specs (
     1, 'Data Engineer', 0, '학사',
     ARRAY['Python', 'Spark', 'Kafka', 'Airflow'],
     ARRAY['정보처리기사', 'SQLD']
-);
+)
+ON CONFLICT DO NOTHING;
 ```
 
-### 4) Airflow에서 파이프라인 실행
+### 2) Run Airflow pipeline
 
-1. 브라우저에서 `http://localhost:8081` 접속
-2. `.env`의 `AIRFLOW_ADMIN_USERNAME / AIRFLOW_ADMIN_PASSWORD`로 로그인
-3. `mentoai_pipeline` DAG를 Unpause
-4. Trigger 실행 후 `run_kafka_producer -> spark_ingest_bronze -> spark_process_silver -> spark_upsert_gold` 성공 확인
+1. `http://localhost:8081` 접속 후 관리자 계정 로그인
+2. `mentoai_pipeline` DAG unpause
+3. Trigger 실행
+4. 다음 태스크 성공 확인
+- `run_kafka_producer`
+- `spark_ingest_bronze`
+- `spark_process_silver`
+- `spark_upsert_gold`
 
-### 5) API 테스트
-
-Swagger: `http://localhost:8000/docs`
+### 3) Test API
 
 ```bash
 curl -X POST "http://localhost:8000/api/v3/jobs/recommend/1" \
@@ -238,28 +211,153 @@ curl -X POST "http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1" \
   -d ''
 ```
 
-## Tech Stack
+## API Endpoints
 
-- Infrastructure: Docker Compose, Airflow
-- Data: Kafka, Spark (PySpark)
-- Storage: AWS S3, PostgreSQL, Qdrant
-- AI/Backend: FastAPI, LangChain, Gemini, KoSimCSE
-- Dependency Management: uv (`pyproject.toml` dependency groups)
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/` | Health check |
+| GET | `/api/v1/test/gemini` | Gemini 연결 테스트 |
+| GET | `/api/v1/users/{user_id}/specs` | 사용자 스펙 조회 |
+| POST | `/api/v1/curation/roadmap/{user_id}` | V1 로드맵 생성 |
+| POST | `/api/v2/curation/roadmap/{user_id}` | V2 구조화 로드맵 생성 |
+| POST | `/api/v3/jobs/recommend/{user_id}` | 추천 공고 목록 + 적합도 점수 |
+| POST | `/api/v3/jobs/{job_id}/analyze/{user_id}` | 공고 상세 분석 |
 
-## Troubleshooting Notes
+## Local Development Workflow
 
-1. Airflow 권한 오류 (RBAC)
-- 현상: 로그인 후 권한 부족으로 페이지 접근 실패
-- 대응: `airflow-init` 재실행 또는 관리자 유저 재생성
+### Dependency groups (`uv`)
 
-2. Postgres 데이터 휘발
-- 현상: 컨테이너 재시작 후 데이터 유실
-- 대응: `infra/postgres_data` 볼륨 마운트 유지 여부 확인
+```bash
+# 서버 개발
+uv sync --group server
 
-3. Silver 적재 누락
-- 현상: Airflow 성공처럼 보이지만 `career_jobs`가 비어 있음
-- 대응: S3 Bronze 경로(`s3a://<bucket>/bronze/career_raw/`) 데이터 유무 확인 후 `spark_process_silver` 재실행
+# Spark 스크립트 실행용
+uv sync --group spark
 
-4. Qdrant 메타데이터 누락
-- 현상: 추천 응답의 회사/포지션이 `"미상"`으로 표기
-- 대응: Qdrant payload 저장 필드(`company`, `position`, `full_text`) 확인
+# Airflow/DAG 개발용
+uv sync --group airflow
+
+# 테스트/정적 분석 포함 전체 개발 환경
+uv sync --group dev
+```
+
+### Common Poe Tasks
+
+`poe`는 자주 쓰는 명령을 짧게 실행하기 위한 태스크 러너입니다.
+
+```bash
+# 실행 형식
+uv run poe <task_name>
+```
+
+| Category | Task | Description |
+| --- | --- | --- |
+| Setup | `setup_env` | `.env`가 없으면 `.env.example`로 생성 |
+| Setup | `sync_dev` | 전체 개발 의존성 설치 |
+| Setup | `sync_server` | API 개발용 의존성 설치 |
+| Setup | `sync_spark` | Spark 스크립트 의존성 설치 |
+| Setup | `sync_airflow` | Airflow/DAG 의존성 설치 |
+| Infra | `infra_up` | `infra/docker-compose.yml` 전체 기동 |
+| Infra | `infra_down` | 인프라 종료/정리 |
+| Infra | `infra_restart` | 인프라 재시작 |
+| Infra | `infra_ps` | 컨테이너 상태 확인 |
+| Infra | `infra_logs` | compose 로그 팔로우 |
+| API | `api_dev` | FastAPI 로컬 개발 서버 실행(reload) |
+| Producer | `producer_wanted` | Wanted 수집 producer 실행 |
+| Producer | `producer_daily` | Work24 일일 수집 producer 실행 |
+| Producer | `producer_backfill` | Work24 백필 producer 실행(기본 1~3페이지) |
+| Spark | `spark_bronze` | Bronze job 실행 |
+| Spark | `spark_silver` | Silver job 실행 |
+| Spark | `spark_gold` | Gold job 실행 |
+| Quality | `lint`, `lint_fix` | Ruff 린트/자동수정 |
+| Quality | `format`, `format_check` | Ruff 포맷/검증 |
+| Quality | `type` | 타입 검사(`ty`) |
+| Quality | `test`, `test_kafka`, `test_spark` | pytest 테스트 |
+| Quality | `check` | `lint + type + test` 순차 실행 |
+
+### Run FastAPI locally (without docker ai-server)
+
+로컬에서 API만 단독 실행할 경우 `.env`의 `DATABASE_URL`, `QDRANT_HOST`를 로컬 주소로 바꿔야 합니다.
+
+예시:
+
+```dotenv
+DATABASE_URL=postgresql://airflow:airflow@localhost:5432/mentoai
+QDRANT_HOST=localhost
+```
+
+실행:
+
+```bash
+uv run uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# or
+uv run poe api_dev
+```
+
+### Run producer manually
+
+```bash
+uv run python kafka/producer_wanted.py
+uv run python kafka/producer_recruit24_daily.py
+uv run python kafka/producer_recruit24_backfill.py 1 3
+
+# or
+uv run poe producer_wanted
+uv run poe producer_daily
+uv run poe producer_backfill
+```
+
+## Data Pipeline Details
+
+1. Ingestion (Kafka)
+- Wanted / Work24 scraper가 raw 메시지를 `career_raw` 토픽으로 전송
+
+2. Bronze (S3)
+- `spark/job_ingest_bronze.py`가 Kafka 스트림을 Parquet로 저장
+- 경로: `s3a://<S3_BUCKET_NAME>/bronze/career_raw/`
+
+3. Silver (PostgreSQL)
+- `spark/job_process_silver.py`가 메시지를 통합 스키마로 정제
+- `source + source_id` 기준 중복 제거 후 `career_jobs` 적재
+
+4. Gold (Qdrant)
+- `spark/job_upsert_gold.py`가 임베딩 생성 후 `career_jobs` 컬렉션 upsert
+- payload에 `company`, `position`, `full_text` 저장
+
+## Test and Quality
+
+```bash
+uv sync --group dev
+uv run poe test
+uv run poe lint
+uv run poe format
+uv run poe type
+uv run poe check
+```
+
+## DAG List
+
+| DAG ID | Schedule | Purpose |
+| --- | --- | --- |
+| `mentoai_pipeline` | `0 9,16 * * *` | E2E 배치 파이프라인 |
+| `producer_daily_dag` | `0 9 * * *` | Work24 일일 수집 |
+| `producer_backfill_dag` | manual | Work24 과거 페이지 백필 |
+
+## Troubleshooting
+
+1. Airflow 로그인 후 권한 오류
+- 원인: 관리자 초기화 미완료 또는 설정 누락
+- 대응: `airflow-init` 서비스 실행 로그 확인, 관리자 계정 재생성
+
+2. Silver 테이블이 비어 있음
+- 원인: Bronze 데이터 미적재 또는 S3 경로/권한 오류
+- 대응: `s3a://<bucket>/bronze/career_raw/` 파일 존재 확인 후 `spark_process_silver` 재실행
+
+3. 추천 응답에서 회사/포지션이 `미상`으로 출력됨
+- 원인: Qdrant payload 필드 누락
+- 대응: `company`, `position`, `full_text` 필드 upsert 여부 확인
+
+4. 로컬 API 실행 시 DB/Qdrant 연결 실패
+- 원인: Docker 내부 호스트명(`postgres`, `mentoai-qdrant`)을 로컬에서 그대로 사용
+- 대응: `.env`를 `localhost` 기준으로 분리해서 사용

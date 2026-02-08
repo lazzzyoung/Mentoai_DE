@@ -67,6 +67,43 @@ lint = "ruff check --exclude .venv ."
 lint_fix = "ruff check --exclude .venv --fix ."
 format = "ruff format --exclude .venv ."
 type = "ty check --exclude .venv ."
+format_check = "ruff format --check --exclude .venv ."
+test = "pytest tests"
+test_kafka = "pytest tests/kafka"
+test_spark = "pytest tests/spark"
+check = ["lint", "type", "test"]
+sync_airflow = "uv sync --group airflow"
+sync_spark = "uv sync --group spark"
+sync_server = "uv sync --group server"
+sync_dev = "uv sync --group dev"
+setup_env = "cp -n .env.example .env || true"
+api_dev = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"
+producer_wanted = "python kafka/producer_wanted.py"
+producer_daily = "python kafka/producer_recruit24_daily.py"
+producer_backfill = "python kafka/producer_recruit24_backfill.py 1 3"
+spark_bronze = "python spark/job_ingest_bronze.py"
+spark_silver = "python spark/job_process_silver.py"
+spark_gold = "python spark/job_upsert_gold.py"
+
+[tool.poe.tasks.infra_up]
+cmd = "docker compose up -d --build"
+cwd = "infra"
+
+[tool.poe.tasks.infra_down]
+cmd = "docker compose down"
+cwd = "infra"
+
+[tool.poe.tasks.infra_restart]
+cmd = "docker compose restart"
+cwd = "infra"
+
+[tool.poe.tasks.infra_ps]
+cmd = "docker compose ps"
+cwd = "infra"
+
+[tool.poe.tasks.infra_logs]
+cmd = "docker compose logs -f --tail=200"
+cwd = "infra"
 
 [tool.ty.src]
 exclude = [".venv/**"]
