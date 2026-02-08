@@ -209,11 +209,11 @@ ON CONFLICT DO NOTHING;
 ### 3) Test API
 
 ```bash
-curl -X POST "http://localhost:8000/api/v3/jobs/recommend/1" \
+curl -X POST "http://localhost:8000/api/v1/jobs/recommend/1" \
   -H "accept: application/json" \
   -d ''
 
-curl -X POST "http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1" \
+curl -X POST "http://localhost:8000/api/v1/jobs/{JOB_ID}/analyze/1" \
   -H "accept: application/json" \
   -d ''
 ```
@@ -225,10 +225,9 @@ curl -X POST "http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1" \
 | GET | `/` | Health check |
 | GET | `/api/v1/test/gemini` | Gemini 연결 테스트 |
 | GET | `/api/v1/users/{user_id}/specs` | 사용자 스펙 조회 |
-| POST | `/api/v1/curation/roadmap/{user_id}` | V1 로드맵 생성 |
-| POST | `/api/v2/curation/roadmap/{user_id}` | V2 구조화 로드맵 생성 |
-| POST | `/api/v3/jobs/recommend/{user_id}` | 추천 공고 목록 + 적합도 점수 |
-| POST | `/api/v3/jobs/{job_id}/analyze/{user_id}` | 공고 상세 분석 |
+| POST | `/api/v1/curation/roadmap/{user_id}` | 구조화 로드맵 생성 |
+| POST | `/api/v1/jobs/recommend/{user_id}` | 추천 공고 목록 + 적합도 점수 |
+| POST | `/api/v1/jobs/{job_id}/analyze/{user_id}` | 공고 상세 분석 |
 
 ## Local Development Workflow
 
@@ -344,6 +343,14 @@ uv run poe format
 uv run poe type
 uv run poe check
 ```
+
+## CI
+
+- GitHub Actions (`.github/workflows/ci.yml`)에서 push / pull_request 시 `uv run poe check`를 실행합니다.
+
+## Changelog
+
+- 변경 이력은 `CHANGELOG.md`에서 관리합니다.
 
 ## DAG List
 

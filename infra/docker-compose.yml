@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   
   zookeeper:
@@ -7,7 +5,6 @@ services:
     container_name: mentoai-zookeeper
     ports:
       - "2181:2181"
-    platform: linux/arm64
 
   
   kafka:
@@ -24,7 +21,6 @@ services:
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
-    platform: linux/arm64
 
   
   kafka-ui:
@@ -37,13 +33,11 @@ services:
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
     depends_on:
       - kafka
-    platform: linux/arm64
 
   
   postgres:
     image: postgres:13
     container_name: mentoai-postgres
-    platform: linux/arm64
     environment:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
@@ -72,7 +66,6 @@ services:
     volumes:
       - ..:/opt/airflow  
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
-    platform: linux/arm64
 
   spark-worker:
     build:
@@ -92,7 +85,6 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
-    platform: linux/arm64
 
   
   qdrant:
@@ -103,7 +95,6 @@ services:
       - "6334:6334"   # gRPC
     volumes:
       - ./qdrant_storage:/qdrant/storage
-    platform: linux/arm64
     
   
   airflow-webserver:
@@ -111,7 +102,6 @@ services:
       context: ..
       dockerfile: infra/airflow/Dockerfile
     container_name: airflow-webserver
-    platform: linux/arm64
     command: webserver
     ports:
       - "8081:8080"
@@ -132,7 +122,6 @@ services:
       context: ..
       dockerfile: infra/airflow/Dockerfile
     container_name: airflow-scheduler
-    platform: linux/arm64
     command: scheduler
     env_file:
       - ../.env
@@ -151,7 +140,6 @@ services:
   airflow-init:
     image: apache/airflow:2.8.1
     container_name: airflow-init
-    platform: linux/arm64
     depends_on:
       - postgres
     env_file:
@@ -173,7 +161,6 @@ services:
       context: ..                
       dockerfile: infra/server/Dockerfile  
     container_name: mentoai-ai-server
-    platform: linux/arm64
     ports:
       - "8000:8000"
     env_file:
