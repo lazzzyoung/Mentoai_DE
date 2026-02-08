@@ -138,6 +138,8 @@ docker compose up -d --build
 
 ```bash
 uv run poe infra_up
+# 또는 (infra 디렉터리 이동 없이)
+uv run poe compose_up
 ```
 
 주요 접속 주소:
@@ -270,6 +272,11 @@ uv run poe <task_name>
 | Infra | `infra_restart` | 인프라 재시작 |
 | Infra | `infra_ps` | 컨테이너 상태 확인 |
 | Infra | `infra_logs` | compose 로그 팔로우 |
+| Infra | `compose_up` | `docker compose -f infra/docker-compose.yml up -d --build` |
+| Infra | `compose_down` | `docker compose -f infra/docker-compose.yml down` |
+| Infra | `compose_restart` | `docker compose -f infra/docker-compose.yml restart` |
+| Infra | `compose_ps` | `docker compose -f infra/docker-compose.yml ps` |
+| Infra | `compose_logs` | `docker compose -f infra/docker-compose.yml logs -f --tail=200` |
 | API | `api_dev` | FastAPI 로컬 개발 서버 실행(reload) |
 | Producer | `producer_wanted` | Wanted 수집 producer 실행 |
 | Producer | `producer_daily` | Work24 일일 수집 producer 실행 |

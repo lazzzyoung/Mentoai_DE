@@ -117,5 +117,20 @@ cwd = "infra"
 cmd = "docker compose logs -f --tail=200"
 cwd = "infra"
 
+[tool.poe.tasks.compose_up]
+cmd = "docker compose -f infra/docker-compose.yml up -d --build"
+
+[tool.poe.tasks.compose_down]
+cmd = "docker compose -f infra/docker-compose.yml down"
+
+[tool.poe.tasks.compose_restart]
+cmd = "docker compose -f infra/docker-compose.yml restart"
+
+[tool.poe.tasks.compose_ps]
+cmd = "docker compose -f infra/docker-compose.yml ps"
+
+[tool.poe.tasks.compose_logs]
+cmd = "docker compose -f infra/docker-compose.yml logs -f --tail=200"
+
 [tool.ty.src]
 exclude = [".venv/**"]
