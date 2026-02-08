@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 
 router = APIRouter(tags=["health"])
+HEALTH_PAYLOAD = {"status": "ok", "message": "MentoAI server is running"}
 
 
-@router.get("/")
+@router.get("/health")
 def health_check() -> dict[str, str]:
-    return {"status": "ok", "message": "MentoAI Brain is running with Gemini"}
+    return HEALTH_PAYLOAD

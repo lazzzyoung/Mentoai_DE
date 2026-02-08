@@ -1,0 +1,132 @@
+{% extends layout_name %}
+
+{% block main_content %}
+<div class="pb-24 bg-white min-h-full">
+    
+    <div class="md:hidden sticky top-0 z-20 bg-white border-b border-slate-100 pt-4 pb-2 px-5 shadow-sm">
+        <div class="relative">
+            <input type="text" placeholder="Search for jobs, skills, companies..."
+                class="w-full h-12 pl-11 pr-4 bg-slate-50 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-slate-400 focus:bg-white transition-colors"
+                autofocus>
+
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                stroke="currentColor" class="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+        </div>
+
+        
+        <div class="flex gap-2 overflow-x-auto py-3 no-scrollbar">
+            <button
+                class="px-3.5 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-full whitespace-nowrap border border-slate-800">All</button>
+            <button
+                class="px-3.5 py-1.5 bg-white text-slate-600 text-xs font-bold rounded-full whitespace-nowrap border border-slate-200 active:bg-slate-50">Remote</button>
+            <button
+                class="px-3.5 py-1.5 bg-white text-slate-600 text-xs font-bold rounded-full whitespace-nowrap border border-slate-200 active:bg-slate-50">Full-time</button>
+            <button
+                class="px-3.5 py-1.5 bg-white text-slate-600 text-xs font-bold rounded-full whitespace-nowrap border border-slate-200 active:bg-slate-50">Internship</button>
+            <button
+                class="px-3.5 py-1.5 bg-white text-slate-600 text-xs font-bold rounded-full whitespace-nowrap border border-slate-200 active:bg-slate-50">Startup</button>
+        </div>
+    </div>
+
+    
+    <div class="hidden md:flex items-center gap-3 py-6 mb-4 border-b border-slate-100">
+        <span class="text-sm font-bold text-slate-800 mr-2">Filters:</span>
+        <button
+            class="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg hover:bg-slate-700 transition-colors">All
+            Types</button>
+        <button
+            class="px-4 py-2 bg-white text-slate-600 text-sm font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">Remote</button>
+        <button
+            class="px-4 py-2 bg-white text-slate-600 text-sm font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">Full-time</button>
+        <button
+            class="px-4 py-2 bg-white text-slate-600 text-sm font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">Internship</button>
+    </div>
+
+    
+    <div class="px-5 pt-6 md:px-0">
+        
+        <div class="mb-8">
+            <h3 class="text-sm font-bold text-slate-800 mb-3 md:text-base">Popular Job Keywords</h3>
+            <div class="flex flex-wrap gap-2">
+                <span
+                    class="px-3 py-2 bg-slate-50 text-slate-600 text-xs md:text-sm font-medium rounded-lg border border-slate-100 cursor-pointer active:bg-slate-100 hover:border-primary hover:text-primary transition-colors">#ProductManager</span>
+                <span
+                    class="px-3 py-2 bg-slate-50 text-slate-600 text-xs md:text-sm font-medium rounded-lg border border-slate-100 cursor-pointer active:bg-slate-100 hover:border-primary hover:text-primary transition-colors">#Python</span>
+                <span
+                    class="px-3 py-2 bg-slate-50 text-slate-600 text-xs md:text-sm font-medium rounded-lg border border-slate-100 cursor-pointer active:bg-slate-100 hover:border-primary hover:text-primary transition-colors">#DataAnalyst</span>
+                <span
+                    class="px-3 py-2 bg-slate-50 text-slate-600 text-xs md:text-sm font-medium rounded-lg border border-slate-100 cursor-pointer active:bg-slate-100 hover:border-primary hover:text-primary transition-colors">#UXDesign</span>
+                <span
+                    class="px-3 py-2 bg-slate-50 text-slate-600 text-xs md:text-sm font-medium rounded-lg border border-slate-100 cursor-pointer active:bg-slate-100 hover:border-primary hover:text-primary transition-colors">#ReactNative</span>
+            </div>
+        </div>
+
+        
+        <div class="md:bg-white md:border md:border-slate-100 md:rounded-xl md:shadow-sm">
+            <div class="flex items-center justify-between mb-2 md:p-4 md:border-b md:border-slate-50 md:mb-0">
+                <h3 class="text-sm font-bold text-slate-800 md:text-base">Recent Searches</h3>
+                <button class="text-xs text-slate-400 font-medium hover:text-slate-600">Clear</button>
+            </div>
+
+            <div
+                class="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-50 md:border-none md:rounded-none">
+                
+                <div
+                    class="flex items-center justify-between p-3.5 hover:bg-slate-50 active:bg-slate-50 cursor-pointer md:p-4 transition-colors group">
+                    <div class="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor"
+                            class="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="text-sm text-slate-600 font-medium group-hover:text-slate-900">Backend
+                            Engineer</span>
+                    </div>
+                    <button class="text-slate-300 p-1 hover:text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                            <path
+                                d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg>
+                    </button>
+                </div>
+
+                
+                <div
+                    class="flex items-center justify-between p-3.5 hover:bg-slate-50 active:bg-slate-50 cursor-pointer md:p-4 transition-colors group">
+                    <div class="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor"
+                            class="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="text-sm text-slate-600 font-medium group-hover:text-slate-900">NVIDIA</span>
+                    </div>
+                    <button class="text-slate-300 p-1 hover:text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                            <path
+                                d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Hide Scrollbar */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+</style>
+{% endblock %}
