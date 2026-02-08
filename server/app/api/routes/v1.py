@@ -4,7 +4,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from server.app.api.deps import get_rag_service
 from server.app.db.session import get_async_session
 from server.app.schemas.user import UserSpecResponse
-from server.app.schemas.v1 import RoadmapResponseV1
+from server.app.schemas.v1 import (
+    DetailedAnalysisResponse,
+    RecommendationListResponse,
+    RoadmapResponse,
+)
 from server.app.services.rag_service import RAGService
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -27,10 +31,31 @@ async def get_user_specs(
     return await service.get_user_specs(user_id, session)
 
 
-@router.post("/curation/roadmap/{user_id}", response_model=RoadmapResponseV1)
-async def generate_career_roadmap_v1(
+@router.post("/curation/roadmap/{user_id}", response_model=RoadmapResponse)
+async def generate_career_roadmap(
     user_id: int,
     service: RAGService = Depends(get_rag_service),
     session: AsyncSession = Depends(get_async_session),
-) -> RoadmapResponseV1:
-    return await service.generate_career_roadmap_v1(user_id, session)
+) -> RoadmapResponse:
+    return await service.generate_career_roadmap(user_id, session)
+
+
+@router.post("/jobs/recommend/{user_id}", response_model=RecommendationListResponse)
+async def recommend_jobs_list(
+    user_id: int,
+    service: RAGService = Depends(get_rag_service),
+    session: AsyncSession = Depends(get_async_session),
+) -> RecommendationListResponse:
+    return await service.recommend_jobs_list(user_id, session)
+
+
+@router.post(
+    "/jobs/{job_id}/analyze/{user_id}", response_model=DetailedAnalysisResponse
+)
+async def analyze_job_detail(
+    job_id: int,
+    user_id: int,
+    service: RAGService = Depends(get_rag_service),
+    session: AsyncSession = Depends(get_async_session),
+) -> DetailedAnalysisResponse:
+    return await service.analyze_job_detail(job_id, user_id, session)

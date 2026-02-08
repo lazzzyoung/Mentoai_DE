@@ -21,5 +21,6 @@ def test_create_app_registers_api_routes() -> None:
     paths = {getattr(route, "path", "") for route in app.routes}
 
     assert "/api/v1/test/gemini" in paths
-    assert "/api/v2/curation/roadmap/{user_id}" in paths
-    assert "/api/v3/jobs/recommend/{user_id}" in paths
+    assert "/api/v1/curation/roadmap/{user_id}" in paths
+    assert "/api/v1/jobs/recommend/{user_id}" in paths
+    assert "/api/v1/jobs/{job_id}/analyze/{user_id}" in paths

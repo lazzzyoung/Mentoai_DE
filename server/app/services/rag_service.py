@@ -3,7 +3,7 @@ from typing import Any, TypedDict
 
 from fastapi import HTTPException
 from langchain_core.documents import Document
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import (
     ChatGoogleGenerativeAI,
@@ -19,25 +19,20 @@ from starlette.concurrency import run_in_threadpool
 
 from server.app.core.config import Settings
 from server.app.repositories.user_repository import UserRepository
-from server.app.schemas.v1 import RoadmapResponseV1
-from server.app.schemas.v2 import AnalysisResultV2, JobRecommendation, RoadmapResponseV2
-from server.app.schemas.v3 import (
+from server.app.schemas.v1 import (
+    AnalysisResult,
     ActionItem,
     DetailedAnalysisResponse,
-    JobSummaryList,
+    JobRecommendation,
+    JobSummary,
     RecommendationListResponse,
+    RoadmapResponse,
 )
 
 logger = logging.getLogger(__name__)
 
 
-ROADMAP_V1_PROMPT = """
-[사용자] {user_specs}
-[채용공고] {context}
-합격을 위한 전략적 로드맵을 Markdown으로 작성해주세요.
-"""
-
-ROADMAP_V2_PROMPT = """
+ROADMAP_PROMPT = """
 사용자 스펙과 공고를 비교하여 JSON으로 응답하세요. 마크다운 사용 금지.
 [프로필] {user_specs}
 [공고] {context}
@@ -109,6 +104,11 @@ class JobContext(TypedDict):
     content: str
 
 
+class JobSummaryListPayload(BaseModel):
+    jobs: list[JobSummary]
+
+
+# LLM은 본문 분석 필드만 생성하고, job/company 식별자는 서버에서 주입한다.
 class DetailedAnalysisPayload(BaseModel):
     current_score: int
     max_score: int = 100
@@ -264,11 +264,11 @@ class RAGService:
                 status_code=500, detail="Gemini connection failed"
             ) from exc
 
-    async def generate_career_roadmap_v1(
+    async def generate_career_roadmap(
         self,
         user_id: int,
         session: AsyncSession,
-    ) -> RoadmapResponseV1:
+    ) -> RoadmapResponse:
         try:
             user_info = await self._fetch_user_info(user_id, session)
             user_query_text = self._build_user_query_text(user_info)
@@ -279,58 +279,10 @@ class RAGService:
                 3,
             )
             if not retrieved_docs:
-                return RoadmapResponseV1(
+                return RoadmapResponse(
                     user_name=user_info["username"],
                     recommended_jobs=[],
-                    analysis_result="공고 없음",
-                )
-
-            prompt = ChatPromptTemplate.from_template(ROADMAP_V1_PROMPT)
-            chain = prompt | self.llm | StrOutputParser()
-            analysis_result = await run_in_threadpool(
-                chain.invoke,
-                {
-                    "user_specs": user_query_text,
-                    "context": self._format_docs(retrieved_docs, content_limit=300),
-                },
-            )
-
-            recommended_jobs = [
-                str(doc.metadata.get("position") or "미상") for doc in retrieved_docs
-            ]
-
-            return RoadmapResponseV1(
-                user_name=user_info["username"],
-                recommended_jobs=recommended_jobs,
-                analysis_result=analysis_result,
-            )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.error("V1 roadmap 생성 실패: %s", exc)
-            raise HTTPException(
-                status_code=500, detail="V1 roadmap generation failed"
-            ) from exc
-
-    async def generate_career_roadmap_v2(
-        self,
-        user_id: int,
-        session: AsyncSession,
-    ) -> RoadmapResponseV2:
-        try:
-            user_info = await self._fetch_user_info(user_id, session)
-            user_query_text = self._build_user_query_text(user_info)
-
-            retrieved_docs = await run_in_threadpool(
-                self._similarity_search,
-                user_query_text,
-                3,
-            )
-            if not retrieved_docs:
-                return RoadmapResponseV2(
-                    user_name=user_info["username"],
-                    recommended_jobs=[],
-                    analysis_result=AnalysisResultV2(
+                    analysis_result=AnalysisResult(
                         current_score=0,
                         summary="공고 없음",
                         gap_analysis=[],
@@ -338,8 +290,8 @@ class RAGService:
                     ),
                 )
 
-            parser = JsonOutputParser(pydantic_object=AnalysisResultV2)
-            prompt = ChatPromptTemplate.from_template(ROADMAP_V2_PROMPT)
+            parser = JsonOutputParser(pydantic_object=AnalysisResult)
+            prompt = ChatPromptTemplate.from_template(ROADMAP_PROMPT)
             chain = prompt | self.llm | parser
             parsed_result = await run_in_threadpool(
                 chain.invoke,
@@ -350,7 +302,7 @@ class RAGService:
                 },
             )
 
-            analysis_result = AnalysisResultV2.model_validate(parsed_result)
+            analysis_result = AnalysisResult.model_validate(parsed_result)
 
             recommended_jobs = [
                 JobRecommendation(
@@ -361,7 +313,7 @@ class RAGService:
                 for doc in retrieved_docs
             ]
 
-            return RoadmapResponseV2(
+            return RoadmapResponse(
                 user_name=user_info["username"],
                 recommended_jobs=recommended_jobs,
                 analysis_result=analysis_result,
@@ -369,9 +321,9 @@ class RAGService:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error("V2 roadmap 생성 실패: %s", exc)
+            logger.error("Roadmap 생성 실패: %s", exc)
             raise HTTPException(
-                status_code=500, detail="V2 roadmap generation failed"
+                status_code=500, detail="Roadmap generation failed"
             ) from exc
 
     async def recommend_jobs_list(
@@ -395,7 +347,7 @@ class RAGService:
                     user_name=user_info["username"], recommendations=[]
                 )
 
-            parser = JsonOutputParser(pydantic_object=JobSummaryList)
+            parser = JsonOutputParser(pydantic_object=JobSummaryListPayload)
             prompt = ChatPromptTemplate.from_template(RECOMMENDATION_PROMPT)
             chain = prompt | self.llm | parser
 
@@ -412,7 +364,7 @@ class RAGService:
                 },
             )
 
-            validated_result = JobSummaryList.model_validate(parsed_result)
+            validated_result = JobSummaryListPayload.model_validate(parsed_result)
             return RecommendationListResponse(
                 user_name=user_info["username"],
                 recommendations=validated_result.jobs,
