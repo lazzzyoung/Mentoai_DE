@@ -1,0 +1,163 @@
+[project]
+name = "mentoai-de"
+version = "0.1.0"
+description = "MentoAI data engineering and RAG backend"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = []
+
+[dependency-groups]
+airflow = [
+    "apache-airflow==2.8.1",
+    "pendulum",
+    "python-dotenv",
+    "requests",
+    "beautifulsoup4",
+    "kafka-python",
+    "apache-airflow-providers-docker==3.14.1",
+    "apache-airflow-providers-slack==8.9.2",
+    "psycopg2-binary",
+    "boto3",
+    "qdrant-client>=1.9.0",
+]
+spark = [
+    "python-dotenv",
+    "kafka-python",
+    "psycopg2-binary",
+    "boto3",
+    "qdrant-client>=1.9.0",
+    "sentence-transformers",
+    "torch",
+    "pyspark",
+]
+server = [
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "email-validator>=2",
+    "sqlalchemy",
+    "sqlmodel",
+    "asyncpg",
+    "alembic",
+    "pydantic",
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    "langchain-google-genai>=2.0.0",
+    "langchain-qdrant",
+    "qdrant-client>=1.9.0",
+    "langchain-huggingface",
+    "sentence-transformers",
+]
+runtime = [
+    { include-group = "spark" },
+    { include-group = "server" },
+]
+dev = [
+    { include-group = "runtime" },
+    "pytest",
+    "ruff",
+    "poethepoet",
+    "ty>=0.0.15",
+]
+
+[tool.uv]
+conflicts = [
+    [
+        { group = "airflow" },
+        { group = "server" },
+    ],
+]
+
+[tool.ruff]
+extend-exclude = [".venv"]
+
+[tool.poe.tasks]
+lint = "ruff check --exclude .venv ."
+lint_fix = "ruff check --exclude .venv --fix ."
+format = "ruff format --exclude .venv ."
+type = "ty check --exclude .venv ."
+format_check = "ruff format --check --exclude .venv ."
+test = "pytest tests"
+test_kafka = "pytest tests/kafka"
+test_spark = "pytest tests/spark"
+check = ["lint", "type", "test"]
+sync_airflow = "uv sync --group airflow"
+sync_spark = "uv sync --group spark"
+sync_server = "uv sync --group server"
+sync_dev = "uv sync --group dev"
+setup_env = "cp -n .env.example .env || true"
+env = "cp -n .env.example .env || true"
+sync = "uv sync --group dev"
+sync_af = "uv sync --group airflow"
+sync_sp = "uv sync --group spark"
+sync_sr = "uv sync --group server"
+server_dev = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"
+server_run = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000"
+api_dev = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"
+dev = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"
+run = "uvicorn server.app.main:app --host 0.0.0.0 --port 8000"
+db_migrate = "alembic upgrade head"
+db_revision = "alembic revision --autogenerate -m 'schema update'"
+mig = "alembic upgrade head"
+rev = "alembic revision --autogenerate -m 'schema update'"
+producer_wanted = "python kafka/producer_wanted.py"
+producer_daily = "python kafka/producer_recruit24_daily.py"
+producer_backfill = "python kafka/producer_recruit24_backfill.py 1 3"
+pw = "python kafka/producer_wanted.py"
+pd = "python kafka/producer_recruit24_daily.py"
+pb = "python kafka/producer_recruit24_backfill.py 1 3"
+spark_bronze = "python spark/job_ingest_bronze.py"
+spark_silver = "python spark/job_process_silver.py"
+spark_gold = "python spark/job_upsert_gold.py"
+brz = "python spark/job_ingest_bronze.py"
+slv = "python spark/job_process_silver.py"
+gld = "python spark/job_upsert_gold.py"
+up = "docker compose -f infra/docker-compose.yml up -d --build"
+down = "docker compose -f infra/docker-compose.yml down"
+restart = "docker compose -f infra/docker-compose.yml restart"
+ps = "docker compose -f infra/docker-compose.yml ps"
+logs = "docker compose -f infra/docker-compose.yml logs -f --tail=200"
+
+[tool.poe.tasks.infra_up]
+cmd = "docker compose up -d --build"
+cwd = "infra"
+
+[tool.poe.tasks.infra_down]
+cmd = "docker compose down"
+cwd = "infra"
+
+[tool.poe.tasks.infra_restart]
+cmd = "docker compose restart"
+cwd = "infra"
+
+[tool.poe.tasks.infra_ps]
+cmd = "docker compose ps"
+cwd = "infra"
+
+[tool.poe.tasks.infra_logs]
+cmd = "docker compose logs -f --tail=200"
+cwd = "infra"
+
+[tool.poe.tasks.compose_up]
+cmd = "docker compose -f infra/docker-compose.yml up -d --build"
+
+[tool.poe.tasks.compose_down]
+cmd = "docker compose -f infra/docker-compose.yml down"
+
+[tool.poe.tasks.compose_restart]
+cmd = "docker compose -f infra/docker-compose.yml restart"
+
+[tool.poe.tasks.compose_ps]
+cmd = "docker compose -f infra/docker-compose.yml ps"
+
+[tool.poe.tasks.compose_logs]
+cmd = "docker compose -f infra/docker-compose.yml logs -f --tail=200"
+
+[tool.ty.src]
+exclude = [
+    ".venv/**",
+    "dags/**",
+    "webserver_config.py",
+    "kafka/utils/recruit24_scraper.py",
+]

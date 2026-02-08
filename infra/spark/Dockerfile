@@ -1,9 +1,14 @@
-FROM apache/spark-py:latest
+FROM apache/spark-py:v3.5.0
 
 USER root
 
-COPY requirements.txt .
+RUN pip install --no-cache-dir uv
 
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /opt/airflow
+
+COPY pyproject.toml ./
+
+RUN UV_CACHE_DIR=/tmp/uv-cache \
+    uv pip install --system --break-system-packages --group spark --torch-backend cpu --project /opt/airflow
 
 USER spark

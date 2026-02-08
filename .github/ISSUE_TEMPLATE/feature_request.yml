@@ -1,0 +1,62 @@
+name: 기능 요청
+description: 새로운 기능 또는 제품 개선안을 제안합니다
+title: "[기능] "
+labels:
+  - "type:feature"
+  - "needs-triage"
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제 정의
+      description: 어떤 사용자/비즈니스 문제를 해결하려는지 작성해주세요.
+      placeholder: "예: 사용자가 멘토 답변을 빠르게 비교하기 어렵습니다."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안 솔루션
+      description: 제안하는 동작과 사용자 흐름을 설명해주세요.
+      placeholder: "무엇을 만들면 좋은지 작성해주세요."
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 범위
+      description: 혼선을 줄이기 위해 포함/제외 범위를 구분해주세요.
+      placeholder: |
+        포함 범위:
+        - ...
+        제외 범위:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 대안 검토
+      description: 검토했던 다른 옵션과 채택하지 않은 이유를 적어주세요.
+
+  - type: input
+    id: success_metrics
+    attributes:
+      label: 성공 지표
+      description: 이 기능의 성공 여부를 어떻게 측정할지 작성해주세요.
+      placeholder: "예: 활성화율 +10%, 문의 티켓 -20%"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 우선순위
+      options:
+        - "P0 - 필수"
+        - "P1 - 높음"
+        - "P2 - 보통"
+        - "P3 - 있으면 좋음"
+    validations:
+      required: true

@@ -1,34 +1,43 @@
-import sys
-import os
-from dotenv import load_dotenv
+import logging
 
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from utils.spark_session import create_spark_session
+from dotenv import load_dotenv
+from pyspark.sql.functions import col, current_timestamp, get_json_object, to_date
+
+from utils.config import load_runtime_config
 from utils.readers import read_stream_from_kafka
-from utils.writers import write_raw_to_s3 
+from utils.spark_session import create_spark_session
+from utils.writers import write_raw_to_s3
 
 load_dotenv()
 
-kafka_bootstrap = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
-topic_name = os.getenv('KAFKA_TOPIC_NAME')
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def run_ingest_bronze():
-    spark = create_spark_session("MentoAI_Job1_Bronze")
-    
-    # Kafka에서 Raw Data 읽기
-    raw_kafka_df = read_stream_from_kafka(spark, kafka_bootstrap, topic_name)
-    
-    # metadata 추가
-    from pyspark.sql.functions import col, get_json_object, to_date, current_timestamp
-    
-    bronze_df = raw_kafka_df.selectExpr("CAST(value AS STRING) as raw_json") \
-        .withColumn("collected_at", get_json_object(col("raw_json"), "$.collected_at")) \
-        .withColumn("collected_date", to_date(col("collected_at"))) \
+
+def run_ingest_bronze() -> None:
+    runtime_config = load_runtime_config()
+    if not runtime_config.s3_bucket_name:
+        raise ValueError("S3_BUCKET_NAME 환경변수가 필요합니다.")
+
+    spark = create_spark_session("MentoAI_Job1_Bronze", runtime_config)
+
+    raw_kafka_df = read_stream_from_kafka(
+        spark=spark,
+        bootstrap_servers=runtime_config.kafka_bootstrap_servers,
+        topic_name=runtime_config.kafka_topic_name,
+    )
+
+    bronze_df = (
+        raw_kafka_df.selectExpr("CAST(value AS STRING) as raw_json")
+        .withColumn("collected_at", get_json_object(col("raw_json"), "$.collected_at"))
+        .withColumn("collected_date", to_date(col("collected_at")))
         .withColumn("ingestion_time", current_timestamp())
+    )
 
-    # S3 Bronze 경로에 저장
-    query = write_raw_to_s3(bronze_df)
+    query = write_raw_to_s3(bronze_df, runtime_config.s3_bucket_name)
+    logger.info("Bronze 적재 query 시작")
     query.awaitTermination()
+
 
 if __name__ == "__main__":
     run_ingest_bronze()

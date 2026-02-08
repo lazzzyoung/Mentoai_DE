@@ -1,0 +1,162 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="flex flex-col min-h-screen w-full bg-slate-50 relative font-sans">
+    <header
+        class="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-100 h-14 pt-[env(safe-area-inset-top)] flex items-center justify-between px-5 transition-all duration-300 safe-pt">
+        <a href="/" class="flex items-center gap-1 active:scale-95 transition-transform duration-200" hx-get="/" hx-push-url="true"
+            hx-target="#main-content" hx-swap="innerHTML">
+            <div class="w-8 h-8 flex items-center justify-center text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                        d="M9.315 7.584C12.195 3.883 16.695 1.5 21.75 1.5a.75.75 0 01.75.75c0 5.056-2.383 9.555-6.084 12.436h.678c1.747 0 3.332.474 4.735 1.288A.75.75 0 0121.75 17c0 2.257-2.994 4.23-7.75 4.75a.75.75 0 01-.75-.75V21H12v.75a.75.75 0 01-.75.75c-4.756-.52-7.75-2.493-7.75-4.75a.75.75 0 01.077-.329L4.986 17H3a.75.75 0 01-.75-.75V13.5a.75.75 0 01.75-.75h1.318A12.696 12.696 0 019.315 7.584zM12.75 12h.678c.647-.468 1.343-.88 2.073-1.229.624-2.527 2.056-4.772 4.028-6.398-3.045.242-5.748 1.926-7.397 4.509A12.72 12.72 0 0112 11.237v.763zm-4.32-.239c-1.65-2.583-4.351-4.267-7.398-4.509 1.972 1.626 3.404 3.87 4.028 6.398A11.272 11.272 0 017.152 11.76l1.278.435z"
+                        clip-rule="evenodd" />
+                </svg>
+            </div>
+            <span class="font-bold text-lg text-slate-800 tracking-tight">Mento AI</span>
+        </a>
+
+        <div class="flex gap-4">
+            <button class="text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <header
+        class="hidden md:flex fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 h-16 items-center justify-between px-8 shadow-sm">
+        <div class="flex items-center gap-8">
+            <a href="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity" hx-get="/" hx-push-url="true"
+                hx-target="#main-content" hx-swap="innerHTML">
+                <div class="w-8 h-8 flex items-center justify-center text-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7">
+                        <path fill-rule="evenodd"
+                            d="M9.315 7.584C12.195 3.883 16.695 1.5 21.75 1.5a.75.75 0 01.75.75c0 5.056-2.383 9.555-6.084 12.436h.678c1.747 0 3.332.474 4.735 1.288A.75.75 0 0121.75 17c0 2.257-2.994 4.23-7.75 4.75a.75.75 0 01-.75-.75V21H12v.75a.75.75 0 01-.75.75c-4.756-.52-7.75-2.493-7.75-4.75a.75.75 0 01.077-.329L4.986 17H3a.75.75 0 01-.75-.75V13.5a.75.75 0 01.75-.75h1.318A12.696 12.696 0 019.315 7.584zM12.75 12h.678c.647-.468 1.343-.88 2.073-1.229.624-2.527 2.056-4.772 4.028-6.398-3.045.242-5.748 1.926-7.397 4.509A12.72 12.72 0 0112 11.237v.763zm-4.32-.239c-1.65-2.583-4.351-4.267-7.398-4.509 1.972 1.626 3.404 3.87 4.028 6.398A11.272 11.272 0 017.152 11.76l1.278.435z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <span class="font-bold text-xl text-slate-800 tracking-tight">Mento AI</span>
+            </a>
+
+            <nav class="flex items-center gap-6">
+                <a href="/" hx-get="/" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                    class="text-sm font-bold text-slate-600 hover:text-primary transition-colors py-2 border-b-2 border-transparent hover:border-primary">Home</a>
+                <a href="#"
+                    class="text-sm font-bold text-slate-600 hover:text-primary transition-colors py-2 border-b-2 border-transparent hover:border-primary">Network</a>
+                <a href="/search" hx-get="/search" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                    class="text-sm font-bold text-slate-600 hover:text-primary transition-colors py-2 border-b-2 border-transparent hover:border-primary">Jobs</a>
+            </nav>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="relative hidden lg:block">
+                <input type="text" placeholder="Search..."
+                    class="bg-slate-100 rounded-full pl-10 pr-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-64 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3.5 top-2 text-slate-400"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            <div class="h-6 w-px bg-slate-200 mx-2"></div>
+            <a href="/profile" hx-get="/profile" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                class="flex items-center gap-2 hover:bg-slate-50 rounded-full pr-3 pl-1 py-1 transition-colors border border-transparent hover:border-slate-100">
+                <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+                    <img src="https://ui-avatars.com/api/?name=Na+Na&background=0D8ABC&color=fff"
+                        class="w-full h-full object-cover">
+                </div>
+                <span class="text-sm font-bold text-slate-700">Nana</span>
+            </a>
+            <button
+                class="bg-primary text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                For Enterprise
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto w-full pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0 md:pt-16 bg-white md:bg-slate-50">
+        <div id="main-content" class="h-full w-full mx-auto md:max-w-6xl md:px-6 md:py-6">
+            {% block main_content %}{% endblock %}
+        </div>
+    </main>
+
+    <nav
+        class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 pb-[env(safe-area-inset-bottom)] safe-pb">
+        <div class="h-14 flex justify-around items-center px-6">
+            <a href="/" hx-get="/" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                class="flex flex-col items-center gap-1 group">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                    class="w-6 h-6 text-slate-300 group-[.active]:text-slate-800 transition-colors">
+                    <path
+                        d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
+                    <path
+                        d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+                </svg>
+                <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-slate-800">Home</span>
+            </a>
+
+            <a href="#" class="flex flex-col items-center gap-1 group">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                    class="w-6 h-6 text-slate-300 group-[.active]:text-slate-800 transition-colors">
+                    <path fill-rule="evenodd"
+                        d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 5.25V4.5z"
+                        clip-rule="evenodd" />
+                </svg>
+                <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-slate-800">Network</span>
+            </a>
+
+            <a href="/search" hx-get="/search" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                class="flex flex-col items-center gap-1 group">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                    class="w-6 h-6 text-slate-300 group-[.active]:text-slate-800 transition-colors">
+                    <path fill-rule="evenodd"
+                        d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z"
+                        clip-rule="evenodd" />
+                </svg>
+                <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-slate-800">Jobs</span>
+            </a>
+
+            <a href="/profile" hx-get="/profile" hx-push-url="true" hx-target="#main-content" hx-swap="innerHTML"
+                class="flex flex-col items-center gap-1 group">
+                <div class="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
+                    <img src="https://ui-avatars.com/api/?name=Na+Na&background=0D8ABC&color=fff"
+                        class="w-full h-full object-cover">
+                </div>
+                <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-slate-800">My</span>
+            </a>
+        </div>
+    </nav>
+</div>
+
+<script>
+    function updateActiveTab() {
+        const path = window.location.pathname;
+        document.querySelectorAll('header.hidden nav a').forEach(el => {
+            const href = el.getAttribute('href');
+            if (path === href || (path === '/' && href === '/')) {
+                el.classList.add('text-primary', 'border-primary');
+                el.classList.remove('text-slate-600', 'border-transparent');
+            } else {
+                el.classList.remove('text-primary', 'border-primary');
+                el.classList.add('text-slate-600', 'border-transparent');
+            }
+        });
+
+        document.querySelectorAll('nav.md\\:hidden a').forEach(el => {
+            const href = el.getAttribute('href');
+            if (path === href || (path === '/' && href === '/')) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', updateActiveTab);
+    document.addEventListener('htmx:afterSwap', updateActiveTab);
+    document.addEventListener('htmx:historyRestore', updateActiveTab);
+</script>
+{% endblock %}
