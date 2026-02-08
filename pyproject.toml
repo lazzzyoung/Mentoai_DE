@@ -155,4 +155,9 @@ cmd = "docker compose -f infra/docker-compose.yml ps"
 cmd = "docker compose -f infra/docker-compose.yml logs -f --tail=200"
 
 [tool.ty.src]
-exclude = [".venv/**"]
+exclude = [
+    ".venv/**",
+    "dags/**",
+    "webserver_config.py",
+    "kafka/utils/recruit24_scraper.py",
+]
