@@ -1,0 +1,241 @@
+import logging
+from typing import Any, cast
+
+from fastapi import HTTPException
+
+from server.app.core.config import COLLECTION_NAME, GOOGLE_API_KEY, QDRANT_URL
+from server.app.repositories.user_repository import fetch_user_info
+from server.app.schemas.v3 import (
+    DetailedAnalysisResponse,
+    JobSummaryList,
+    RecommendationListResponse,
+)
+
+logger = logging.getLogger(__name__)
+
+_resources: dict[str, Any] | None = None
+
+
+def _get_resources() -> dict[str, Any]:
+    global _resources
+
+    if _resources is not None:
+        return _resources
+
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI,
+        HarmBlockThreshold,
+        HarmCategory,
+    )
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_qdrant import QdrantVectorStore
+    from qdrant_client import QdrantClient
+
+    logger.info("Loading Embedding Model...")
+    embeddings = HuggingFaceEmbeddings(
+        model_name="BM-K/KoSimCSE-roberta-multitask",
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
+    logger.info("🔌 Connecting to Qdrant at %s...", QDRANT_URL)
+    client = QdrantClient(url=QDRANT_URL)
+
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name=COLLECTION_NAME,
+        embedding=embeddings,
+        content_payload_key="full_text",
+        metadata_payload_key=cast(str, None),
+    )
+
+    logger.info("🧠 Initializing Google Gemini 3 Flash Preview...")
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-3-flash-preview",
+        google_api_key=GOOGLE_API_KEY,
+        temperature=0.3,
+        safety_settings={
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        },
+    )
+
+    _resources = {"client": client, "vector_store": vector_store, "llm": llm}
+    return _resources
+
+
+def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
+    try:
+        user_info = fetch_user_info(user_id)
+        user_query_text = (
+            f"희망직무: {user_info['desired_job']}, "
+            f"보유기술: {', '.join(user_info['skills'] or [])}, "
+            f"경력: {user_info['career_years']}년"
+        )
+
+        resources = _get_resources()
+        vector_store = resources["vector_store"]
+        client = resources["client"]
+        llm = resources["llm"]
+
+        retrieved_docs = vector_store.similarity_search(user_query_text, k=5)
+        if not retrieved_docs:
+            return RecommendationListResponse(user_name=user_info["username"], recommendations=[])
+
+        jobs_context = []
+        for doc in retrieved_docs:
+            doc_id = doc.metadata.get("id") or doc.metadata.get("_id")
+            company = "미상"
+            title = "미상"
+            content = doc.page_content
+
+            if doc_id:
+                try:
+                    points = client.retrieve(
+                        collection_name=COLLECTION_NAME,
+                        ids=[doc_id],
+                        with_payload=True,
+                    )
+                    if points:
+                        payload = points[0].payload
+                        company = payload.get("company", "미상")
+                        title = payload.get("position", "미상")
+                        content = payload.get("full_text", content)
+                except Exception as fetch_error:
+                    logger.warning("Metadata fetch failed for ID %s: %s", doc_id, fetch_error)
+
+            jobs_context.append(
+                {
+                    "job_id": doc_id,
+                    "company": company,
+                    "title": title,
+                    "content": content[:300],
+                }
+            )
+
+        parser = JsonOutputParser(pydantic_object=JobSummaryList)
+        template = """
+        당신은 아주 깐깐하고 엄격한 IT 면접관입니다.
+        [사용자 프로필]과 [공고 목록]을 비교하여 냉정하게 적합도 점수를 매기세요.
+        
+        [사용자 프로필] {user_specs}
+        [공고 목록] {jobs_context}
+        
+        **채점 기준 (Strict Scoring):**
+        1. **기본 점수는 50점**에서 시작하세요.
+        2. **감점 요인**:
+           - 공고가 '시니어(4년 이상)'를 요구하는데 사용자가 '신입/주니어'라면 **무조건 70점 미만**으로 채점하세요.
+           - 클라우드(AWS/GCP), Kubernetes, 운영 경험 등 핵심 역량이 부족하면 가차 없이 감점하세요.
+        3. **가산 요인**: 기술 스택(Spark, Kafka 등)이 정확히 일치할 때만 점수를 올리세요.
+        4. **최종 점수**: 보통 60~85점 사이가 나와야 정상입니다. 90점 이상은 완벽하게 일치할 때만 주세요.
+        5. match_score, reason, job_id, company, title 필드를 포함하여 JSON으로 응답하세요.
+        
+        **출력 포맷 (JSON):**
+        {format_instructions}
+        """
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = prompt | llm | parser
+
+        result = chain.invoke(
+            {
+                "user_specs": user_query_text,
+                "jobs_context": str(jobs_context),
+                "format_instructions": parser.get_format_instructions(),
+            }
+        )
+
+        scored_jobs = result.get("jobs", []) if isinstance(result, dict) else []
+        return RecommendationListResponse(
+            user_name=user_info["username"],
+            recommendations=scored_jobs,
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.error("V3 List Error: %s", error)
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
+    try:
+        user_info = fetch_user_info(user_id)
+        user_query_text = (
+            f"희망직무: {user_info['desired_job']}, "
+            f"보유기술: {', '.join(user_info['skills'] or [])}"
+        )
+
+        resources = _get_resources()
+        client = resources["client"]
+        llm = resources["llm"]
+
+        points = client.retrieve(collection_name=COLLECTION_NAME, ids=[job_id], with_payload=True)
+        if not points:
+            raise HTTPException(404, "해당 공고를 찾을 수 없습니다.")
+
+        job_payload = points[0].payload
+        job_full_text = job_payload.get("full_text", "")
+        company = job_payload.get("company", "미상")
+        title = job_payload.get("position", "미상")
+
+        parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
+        template = """
+        당신은 IT 대기업 및 유니콘 스타트업의 **시니어 테크 리드(Tech Lead)**이자 채용 최종 결정권자입니다.
+        지원자의 이력서와 공고를 비교 분석하여, 당장 실천 가능한 **'합격 치트키'** 수준의 전략을 수립하세요.
+        
+        [지원자 프로필] {user_specs}
+        [목표 공고] {company} / {title} / {content}
+        
+        **작성 지침 (Deep Dive):**
+        
+        1. **current_score (냉철한 평가)**:
+           - 50~85점 사이로 책정하되, '왜 감점되었는지'를 분석하여 아래 액션 플랜에 녹여내세요.
+           
+        2. **required_tech_stack (핵심 파악)**:
+           - 공고에 나열된 기술 중, 지원자가 없으면 서류 광탈할 만한 **Critical Stack** 3~5가지만 엄선하세요.
+           
+        3. **action_plan (초구체적 실행 가이드)**:
+           - 추상적인 조언(예: "Kubernetes 공부하기")은 **절대 금지**입니다.
+           - **How-to를 포함한 시나리오**를 제시하세요.
+           - **예시**:
+             - (Bad) "클라우드 공부하세요."
+             - (Good) "현재 보유한 FastAPI 프로젝트를 Docker 이미지로 빌드하고, **AWS EKS(Free Tier)**에 배포하는 실습을 하세요. 이때 **Terraform**으로 인프라를 프로비저닝하여 'IaC 경험'을 포트폴리오에 한 줄 추가해야 합니다."
+             - (Good) "지원자는 Spark 경험이 있으니, **Airflow**와 연동하여 '매일 09시에 S3 데이터를 긁어와 마트를 생성하는 DAG'를 구현하고 깃허브에 올리세요."
+             
+        4. **interview_tip (면접관의 시선)**:
+           - 해당 회사의 도메인(핀테크, 커머스, AI 등)과 기술 스택을 결합한 **예상 질문**을 던지고, **모범 답안의 키워드**를 알려주세요.
+        
+        **출력 포맷 (JSON):**
+        {format_instructions}
+        """
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = prompt | llm | parser
+
+        analysis_result = chain.invoke(
+            {
+                "user_specs": user_query_text,
+                "company": company,
+                "title": title,
+                "content": job_full_text,
+                "format_instructions": parser.get_format_instructions(),
+            }
+        )
+
+        if not isinstance(analysis_result, dict):
+            analysis_result = {}
+
+        analysis_result["job_title"] = title
+        analysis_result["company_name"] = company
+        return analysis_result
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.error("V3 Detail Error: %s", error)
+        raise HTTPException(status_code=500, detail=str(error)) from error
