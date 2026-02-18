@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import threading
-from functools import partial
 from typing import Any, cast
 
 from fastapi import HTTPException
@@ -17,19 +15,17 @@ from server.app.schemas.v3 import (
 logger = logging.getLogger(__name__)
 
 _resources: dict[str, Any] | None = None
-_resources_lock = threading.Lock()
+_resources_lock = asyncio.Lock()
 
 
-def _get_resources_sync() -> dict[str, Any]:
-
+def _build_resources_sync() -> dict[str, Any]:
     from langchain_google_genai import (
         ChatGoogleGenerativeAI,
         HarmBlockThreshold,
         HarmCategory,
     )
     from langchain_huggingface import HuggingFaceEmbeddings
-    from langchain_qdrant import QdrantVectorStore
-    from qdrant_client import QdrantClient
+    from qdrant_client import AsyncQdrantClient
 
     logger.info("Loading Embedding Model...")
     embeddings = HuggingFaceEmbeddings(
@@ -39,15 +35,7 @@ def _get_resources_sync() -> dict[str, Any]:
     )
 
     logger.info("🔌 Connecting to Qdrant at %s...", QDRANT_URL)
-    client = QdrantClient(url=QDRANT_URL)
-
-    vector_store = QdrantVectorStore(
-        client=client,
-        collection_name=COLLECTION_NAME,
-        embedding=embeddings,
-        content_payload_key="full_text",
-        metadata_payload_key=cast(str, None),
-    )
+    qdrant_client = AsyncQdrantClient(url=QDRANT_URL)
 
     logger.info("🧠 Initializing Google Gemini 3 Flash Preview...")
     llm = ChatGoogleGenerativeAI(
@@ -62,7 +50,11 @@ def _get_resources_sync() -> dict[str, Any]:
         },
     )
 
-    return {"client": client, "vector_store": vector_store, "llm": llm}
+    return {
+        "embeddings": embeddings,
+        "qdrant_client": qdrant_client,
+        "llm": llm,
+    }
 
 
 async def _get_resources() -> dict[str, Any]:
@@ -71,14 +63,21 @@ async def _get_resources() -> dict[str, Any]:
     if _resources is not None:
         return _resources
 
-    def _load_once() -> dict[str, Any]:
-        global _resources
-        with _resources_lock:
-            if _resources is None:
-                _resources = _get_resources_sync()
-            return _resources
+    async with _resources_lock:
+        if _resources is None:
+            _resources = await asyncio.to_thread(_build_resources_sync)
+        return _resources
 
-    return await asyncio.to_thread(_load_once)
+
+def _coerce_job_id(raw_id: Any) -> int:
+    if isinstance(raw_id, int):
+        return raw_id
+    if isinstance(raw_id, str) and raw_id.isdigit():
+        return int(raw_id)
+    try:
+        return int(str(raw_id))
+    except (TypeError, ValueError):
+        return 0
 
 
 async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
@@ -94,47 +93,35 @@ async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         )
 
         resources = await _get_resources()
-        vector_store = resources["vector_store"]
-        client = resources["client"]
+        embeddings = resources["embeddings"]
+        qdrant_client = resources["qdrant_client"]
         llm = resources["llm"]
 
-        retrieved_docs = await asyncio.to_thread(
-            partial(vector_store.similarity_search, user_query_text, k=5)
+        query_vector = await embeddings.aembed_query(user_query_text)
+        search_result = await qdrant_client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=query_vector,
+            limit=5,
+            with_payload=True,
+            with_vectors=False,
         )
-        if not retrieved_docs:
-            return RecommendationListResponse(user_name=user_info["username"], recommendations=[])
+
+        points = search_result.points or []
+        if not points:
+            return RecommendationListResponse(
+                user_name=user_info["username"],
+                recommendations=[],
+            )
 
         jobs_context = []
-        for doc in retrieved_docs:
-            doc_id = doc.metadata.get("id") or doc.metadata.get("_id")
-            company = "미상"
-            title = "미상"
-            content = doc.page_content
-
-            if doc_id:
-                try:
-                    points = await asyncio.to_thread(
-                        partial(
-                            client.retrieve,
-                            collection_name=COLLECTION_NAME,
-                            ids=[doc_id],
-                            with_payload=True,
-                        )
-                    )
-                    if points:
-                        payload = points[0].payload
-                        company = payload.get("company", "미상")
-                        title = payload.get("position", "미상")
-                        content = payload.get("full_text", content)
-                except Exception as fetch_error:
-                    logger.warning("Metadata fetch failed for ID %s: %s", doc_id, fetch_error)
-
+        for point in points:
+            payload = point.payload or {}
             jobs_context.append(
                 {
-                    "job_id": doc_id,
-                    "company": company,
-                    "title": title,
-                    "content": content[:300],
+                    "job_id": _coerce_job_id(point.id),
+                    "company": payload.get("company", "미상"),
+                    "title": payload.get("position", "미상"),
+                    "content": cast(str, payload.get("full_text", ""))[:300],
                 }
             )
 
@@ -161,13 +148,12 @@ async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         prompt = ChatPromptTemplate.from_template(template)
         chain = prompt | llm | parser
 
-        result = await asyncio.to_thread(
-            chain.invoke,
+        result = await chain.ainvoke(
             {
                 "user_specs": user_query_text,
                 "jobs_context": str(jobs_context),
                 "format_instructions": parser.get_format_instructions(),
-            },
+            }
         )
 
         scored_jobs = result.get("jobs", []) if isinstance(result, dict) else []
@@ -194,24 +180,21 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         )
 
         resources = await _get_resources()
-        client = resources["client"]
+        qdrant_client = resources["qdrant_client"]
         llm = resources["llm"]
 
-        points = await asyncio.to_thread(
-            partial(
-                client.retrieve,
-                collection_name=COLLECTION_NAME,
-                ids=[job_id],
-                with_payload=True,
-            )
+        points = await qdrant_client.retrieve(
+            collection_name=COLLECTION_NAME,
+            ids=[job_id],
+            with_payload=True,
         )
         if not points:
             raise HTTPException(404, "해당 공고를 찾을 수 없습니다.")
 
-        job_payload = points[0].payload
-        job_full_text = job_payload.get("full_text", "")
-        company = job_payload.get("company", "미상")
-        title = job_payload.get("position", "미상")
+        payload = points[0].payload or {}
+        job_full_text = payload.get("full_text", "")
+        company = payload.get("company", "미상")
+        title = payload.get("position", "미상")
 
         parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
         template = """
@@ -246,15 +229,14 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         prompt = ChatPromptTemplate.from_template(template)
         chain = prompt | llm | parser
 
-        analysis_result = await asyncio.to_thread(
-            chain.invoke,
+        analysis_result = await chain.ainvoke(
             {
                 "user_specs": user_query_text,
                 "company": company,
                 "title": title,
                 "content": job_full_text,
                 "format_instructions": parser.get_format_instructions(),
-            },
+            }
         )
 
         if not isinstance(analysis_result, dict):
@@ -268,3 +250,19 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
     except Exception as error:
         logger.error("V3 Detail Error: %s", error)
         raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+async def close_resources() -> None:
+    global _resources
+
+    if _resources is None:
+        return
+
+    async with _resources_lock:
+        if _resources is None:
+            return
+
+        qdrant_client = _resources.get("qdrant_client")
+        if qdrant_client is not None:
+            await qdrant_client.close()
+        _resources = None

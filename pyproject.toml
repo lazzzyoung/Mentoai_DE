@@ -5,6 +5,7 @@ description = "MentoAI data engineering and RAG server project"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "asyncpg",
     "fastapi",
     "langchain",
     "langchain-community",
@@ -12,7 +13,6 @@ dependencies = [
     "langchain-google-genai>=2.0.0",
     "langchain-huggingface",
     "langchain-qdrant",
-    "psycopg2-binary",
     "pydantic",
     "python-dotenv",
     "qdrant-client>=1.9.0",
