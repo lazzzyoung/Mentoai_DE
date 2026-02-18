@@ -1,4 +1,7 @@
+import asyncio
 import logging
+import threading
+from functools import partial
 from typing import Any, cast
 
 from fastapi import HTTPException
@@ -14,13 +17,10 @@ from server.app.schemas.v3 import (
 logger = logging.getLogger(__name__)
 
 _resources: dict[str, Any] | None = None
+_resources_lock = threading.Lock()
 
 
-def _get_resources() -> dict[str, Any]:
-    global _resources
-
-    if _resources is not None:
-        return _resources
+def _get_resources_sync() -> dict[str, Any]:
 
     from langchain_google_genai import (
         ChatGoogleGenerativeAI,
@@ -62,28 +62,45 @@ def _get_resources() -> dict[str, Any]:
         },
     )
 
-    _resources = {"client": client, "vector_store": vector_store, "llm": llm}
-    return _resources
+    return {"client": client, "vector_store": vector_store, "llm": llm}
 
 
-def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
+async def _get_resources() -> dict[str, Any]:
+    global _resources
+
+    if _resources is not None:
+        return _resources
+
+    def _load_once() -> dict[str, Any]:
+        global _resources
+        with _resources_lock:
+            if _resources is None:
+                _resources = _get_resources_sync()
+            return _resources
+
+    return await asyncio.to_thread(_load_once)
+
+
+async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
     from langchain_core.output_parsers import JsonOutputParser
     from langchain_core.prompts import ChatPromptTemplate
 
     try:
-        user_info = fetch_user_info(user_id)
+        user_info = await fetch_user_info(user_id)
         user_query_text = (
             f"희망직무: {user_info['desired_job']}, "
             f"보유기술: {', '.join(user_info['skills'] or [])}, "
             f"경력: {user_info['career_years']}년"
         )
 
-        resources = _get_resources()
+        resources = await _get_resources()
         vector_store = resources["vector_store"]
         client = resources["client"]
         llm = resources["llm"]
 
-        retrieved_docs = vector_store.similarity_search(user_query_text, k=5)
+        retrieved_docs = await asyncio.to_thread(
+            partial(vector_store.similarity_search, user_query_text, k=5)
+        )
         if not retrieved_docs:
             return RecommendationListResponse(user_name=user_info["username"], recommendations=[])
 
@@ -96,10 +113,13 @@ def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
 
             if doc_id:
                 try:
-                    points = client.retrieve(
-                        collection_name=COLLECTION_NAME,
-                        ids=[doc_id],
-                        with_payload=True,
+                    points = await asyncio.to_thread(
+                        partial(
+                            client.retrieve,
+                            collection_name=COLLECTION_NAME,
+                            ids=[doc_id],
+                            with_payload=True,
+                        )
                     )
                     if points:
                         payload = points[0].payload
@@ -141,12 +161,13 @@ def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         prompt = ChatPromptTemplate.from_template(template)
         chain = prompt | llm | parser
 
-        result = chain.invoke(
+        result = await asyncio.to_thread(
+            chain.invoke,
             {
                 "user_specs": user_query_text,
                 "jobs_context": str(jobs_context),
                 "format_instructions": parser.get_format_instructions(),
-            }
+            },
         )
 
         scored_jobs = result.get("jobs", []) if isinstance(result, dict) else []
@@ -161,22 +182,29 @@ def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 
-def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
+async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
     from langchain_core.output_parsers import JsonOutputParser
     from langchain_core.prompts import ChatPromptTemplate
 
     try:
-        user_info = fetch_user_info(user_id)
+        user_info = await fetch_user_info(user_id)
         user_query_text = (
             f"희망직무: {user_info['desired_job']}, "
             f"보유기술: {', '.join(user_info['skills'] or [])}"
         )
 
-        resources = _get_resources()
+        resources = await _get_resources()
         client = resources["client"]
         llm = resources["llm"]
 
-        points = client.retrieve(collection_name=COLLECTION_NAME, ids=[job_id], with_payload=True)
+        points = await asyncio.to_thread(
+            partial(
+                client.retrieve,
+                collection_name=COLLECTION_NAME,
+                ids=[job_id],
+                with_payload=True,
+            )
+        )
         if not points:
             raise HTTPException(404, "해당 공고를 찾을 수 없습니다.")
 
@@ -218,14 +246,15 @@ def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         prompt = ChatPromptTemplate.from_template(template)
         chain = prompt | llm | parser
 
-        analysis_result = chain.invoke(
+        analysis_result = await asyncio.to_thread(
+            chain.invoke,
             {
                 "user_specs": user_query_text,
                 "company": company,
                 "title": title,
                 "content": job_full_text,
                 "format_instructions": parser.get_format_instructions(),
-            }
+            },
         )
 
         if not isinstance(analysis_result, dict):

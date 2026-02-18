@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from fastapi import HTTPException
@@ -5,7 +6,7 @@ from fastapi import HTTPException
 from server.app.core.config import DB_URL
 
 
-def fetch_user_info(user_id: int) -> dict[str, Any]:
+def _fetch_user_info_sync(user_id: int) -> dict[str, Any]:
     import psycopg2
     from psycopg2.extras import RealDictCursor
 
@@ -29,3 +30,7 @@ def fetch_user_info(user_id: int) -> dict[str, Any]:
     finally:
         if conn:
             conn.close()
+
+
+async def fetch_user_info(user_id: int) -> dict[str, Any]:
+    return await asyncio.to_thread(_fetch_user_info_sync, user_id)

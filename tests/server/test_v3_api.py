@@ -21,7 +21,7 @@ def test_v1_v2_endpoints_removed() -> None:
 
 
 def test_recommend_jobs_success(monkeypatch) -> None:
-    def fake_recommend(user_id: int):
+    async def fake_recommend(user_id: int):
         assert user_id == 1
         return {
             "user_name": "테스트유저",
@@ -48,7 +48,7 @@ def test_recommend_jobs_success(monkeypatch) -> None:
 
 
 def test_recommend_jobs_not_found(monkeypatch) -> None:
-    def fake_recommend(_user_id: int):
+    async def fake_recommend(_user_id: int):
         raise HTTPException(status_code=404, detail="User not found")
 
     monkeypatch.setattr(v3_routes.rag_v3_service, "recommend_jobs_list", fake_recommend)
@@ -59,7 +59,7 @@ def test_recommend_jobs_not_found(monkeypatch) -> None:
 
 
 def test_analyze_job_detail_success(monkeypatch) -> None:
-    def fake_analyze(job_id: int, user_id: int):
+    async def fake_analyze(job_id: int, user_id: int):
         assert job_id == 123
         assert user_id == 1
         return {
@@ -91,7 +91,7 @@ def test_analyze_job_detail_success(monkeypatch) -> None:
 
 
 def test_analyze_job_detail_not_found(monkeypatch) -> None:
-    def fake_analyze(_job_id: int, _user_id: int):
+    async def fake_analyze(_job_id: int, _user_id: int):
         raise HTTPException(status_code=404, detail="해당 공고를 찾을 수 없습니다.")
 
     monkeypatch.setattr(v3_routes.rag_v3_service, "analyze_job_detail", fake_analyze)

@@ -11,7 +11,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="MentoAI RAG Server")
 
     @app.get("/")
-    def health_check() -> dict[str, str]:
+    async def health_check() -> dict[str, str]:
         return {"status": "ok", "message": "MentoAI Brain is running with Gemini"}
 
     app.include_router(v3_router)
