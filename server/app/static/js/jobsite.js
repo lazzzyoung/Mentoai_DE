@@ -48,6 +48,8 @@ const LAST_SELECTED_JOB_STORAGE_KEY = "mentoai_last_selected_job_v1";
 
 let currentUserId = null;
 let currentSelectedJobId = null;
+let detailRequestToken = 0;
+let detailAbortController = null;
 let allRecommendations = [];
 let bookmarkJobs = [];
 let jobPageState = {
@@ -253,6 +255,11 @@ const markPipeline = (stepNumber, status) => {
 };
 
 const resetDetail = () => {
+  detailRequestToken += 1;
+  if (detailAbortController) {
+    detailAbortController.abort();
+    detailAbortController = null;
+  }
   currentSelectedJobId = null;
   detailContent.classList.add("hidden");
   detailPlaceholder.classList.remove("hidden");
@@ -549,6 +556,12 @@ const fetchJobDetail = async (job) => {
   if (!currentUserId || !jobId) return;
   if (currentSelectedJobId === jobId && !detailContent.classList.contains("hidden")) return;
   currentSelectedJobId = jobId;
+  detailRequestToken += 1;
+  const requestToken = detailRequestToken;
+  if (detailAbortController) {
+    detailAbortController.abort();
+  }
+  detailAbortController = new AbortController();
 
   saveLastSelectedJob(job);
 
@@ -557,8 +570,12 @@ const fetchJobDetail = async (job) => {
   detailPlaceholder.textContent = "공고 요약을 불러오는 중...";
 
   try {
-    const response = await fetch(`/api/v3/jobs/${jobId}/analyze/${currentUserId}`, { method: "POST" });
+    const response = await fetch(`/api/v3/jobs/${jobId}/analyze/${currentUserId}`, {
+      method: "POST",
+      signal: detailAbortController.signal,
+    });
     const data = await response.json();
+    if (requestToken !== detailRequestToken) return;
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -566,12 +583,19 @@ const fetchJobDetail = async (job) => {
       }
       throw new Error(data?.detail ?? "공고 분석 요청에 실패했습니다.");
     }
+    detailAbortController = null;
     renderDetail(data, job);
   } catch (error) {
+    if (requestToken !== detailRequestToken) return;
+    if (error?.name === "AbortError") return;
     console.error("[job-detail-error]", error);
     detailPlaceholder.classList.remove("hidden");
     detailContent.classList.add("hidden");
     detailPlaceholder.textContent = `안내: ${toFriendlyMessage(error, "공고 요약을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")}`;
+  } finally {
+    if (requestToken === detailRequestToken) {
+      detailAbortController = null;
+    }
   }
 };
 
