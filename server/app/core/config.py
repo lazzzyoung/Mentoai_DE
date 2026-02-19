@@ -8,4 +8,5 @@ DB_URL = os.getenv("DATABASE_URL", "postgresql://airflow:airflow@postgres:5432/m
 QDRANT_HOST = os.getenv("QDRANT_HOST", "mentoai-qdrant")
 QDRANT_URL = f"http://{QDRANT_HOST}:6333"
 COLLECTION_NAME = "career_jobs"
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

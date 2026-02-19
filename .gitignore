@@ -59,11 +59,13 @@ logs/
 data/
 infra/postgres_data/
 infra/qdrant_storage/
+infra/minio_data/
 .omx/
 
 # Spark 체크포인트 (로컬 실행 시 생성됨)
 spark-warehouse/
 checkpoints/
+airflow-webserver.pid
 
 
 *.pptx

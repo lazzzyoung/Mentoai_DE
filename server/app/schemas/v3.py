@@ -14,8 +14,16 @@ class JobSummaryList(BaseModel):
     jobs: list[JobSummary]
 
 
+class UserProfileSummary(BaseModel):
+    desired_job: str = Field(description="회원 가입 시 입력한 희망 직무")
+    career_years: int = Field(default=0, description="경력(년)")
+    skills: list[str] = Field(default_factory=list, description="보유 기술 스택")
+
+
 class RecommendationListResponse(BaseModel):
+    user_id: int
     user_name: str
+    user_profile: UserProfileSummary
     recommendations: list[JobSummary]
 
 
@@ -35,3 +43,16 @@ class DetailedAnalysisResponse(BaseModel):
     required_tech_stack: list[str]
     action_plan: list[ActionItem]
     interview_tip: str
+
+
+class QuickLoginRequest(BaseModel):
+    user_name: str = Field(min_length=1, description="사용자 입력 이름")
+    desired_job: str = Field(default="미입력", description="희망 직무")
+    career_years: int = Field(default=0, ge=0, description="경력(년)")
+    skills: list[str] = Field(default_factory=list, description="보유 기술 스택")
+
+
+class QuickLoginResponse(BaseModel):
+    user_id: int
+    user_name: str
+    user_profile: UserProfileSummary

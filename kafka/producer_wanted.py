@@ -18,7 +18,7 @@ from utils.wanted_scraper import fetch_job_id_list, fetch_job_detail_raw
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WantedProducer")
 
-BASE_URL = os.getenv('WANTED_BASE_URL')
+BASE_URL = os.getenv('WANTED_BASE_URL', 'https://www.wanted.co.kr')
 GROUP_ID = os.getenv('TARGET_JOB_GROUP') # 개발
 JOB_ID_CODE = os.getenv('TARGET_JOB_ID') # 데이터 엔지니어
 BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')

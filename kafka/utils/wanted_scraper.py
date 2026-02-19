@@ -17,15 +17,17 @@ def fetch_job_id_list(session, base_url, group_id, job_id, limit=100):
     while True:
         try:
             params = {
-                "job_group_id": group_id,
-                "job_ids": job_id,
                 "country": "kr",
                 "job_sort": "job.popularity_order",
                 "years": "-1",
                 "locations": "all",
                 "limit": "20",
-                "offset": offset
+                "offset": offset,
             }
+            if group_id:
+                params["job_group_id"] = group_id
+            if job_id:
+                params["job_ids"] = job_id
             
             # session 사용하여 연결 재사용
             response = session.get(api_url, params=params, timeout=10)
@@ -54,10 +56,10 @@ def fetch_job_id_list(session, base_url, group_id, job_id, limit=100):
             
             offset += 20
             
-            # 안전장치: 너무 많이 긁으면 중단 (테스트용)
-            # if len(job_ids) >= limit:
-            #     logger.info(f"🛑 설정된 제한({limit})에 도달하여 ID 수집 중단")
-            #     break
+            # 안전장치: 너무 많이 긁으면 중단
+            if len(job_ids) >= limit:
+                logger.info(f"🛑 설정된 제한({limit})에 도달하여 ID 수집 중단")
+                break
             
             # 봇 탐지 회피용
             time.sleep(random.uniform(0.5, 1.0))

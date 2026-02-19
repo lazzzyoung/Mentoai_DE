@@ -4,12 +4,15 @@ from typing import Any, cast
 
 from fastapi import HTTPException
 
-from server.app.core.config import COLLECTION_NAME, GOOGLE_API_KEY, QDRANT_URL
-from server.app.repositories.user_repository import fetch_user_info
+from server.app.core.config import COLLECTION_NAME, OPENAI_API_KEY, OPENAI_MODEL, QDRANT_URL
+from server.app.repositories.user_repository import create_quick_user, fetch_user_info
 from server.app.schemas.v3 import (
     DetailedAnalysisResponse,
     JobSummaryList,
+    QuickLoginRequest,
+    QuickLoginResponse,
     RecommendationListResponse,
+    UserProfileSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,12 +22,8 @@ _resources_lock = asyncio.Lock()
 
 
 def _build_resources_sync() -> dict[str, Any]:
-    from langchain_google_genai import (
-        ChatGoogleGenerativeAI,
-        HarmBlockThreshold,
-        HarmCategory,
-    )
     from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_openai import ChatOpenAI
     from qdrant_client import AsyncQdrantClient
 
     logger.info("Loading Embedding Model...")
@@ -37,17 +36,16 @@ def _build_resources_sync() -> dict[str, Any]:
     logger.info("🔌 Connecting to Qdrant at %s...", QDRANT_URL)
     qdrant_client = AsyncQdrantClient(url=QDRANT_URL)
 
-    logger.info("🧠 Initializing Google Gemini 3 Flash Preview...")
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-3-flash-preview",
-        google_api_key=GOOGLE_API_KEY,
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+
+    logger.info("🧠 Initializing OpenAI model: %s", OPENAI_MODEL)
+    chat_openai = cast(Any, ChatOpenAI)
+    llm = chat_openai(
+        model=OPENAI_MODEL,
+        api_key=OPENAI_API_KEY,
         temperature=0.3,
-        safety_settings={
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        },
+        max_retries=2,
     )
 
     return {
@@ -80,17 +78,68 @@ def _coerce_job_id(raw_id: Any) -> int:
         return 0
 
 
+def _to_user_profile(user_info: dict[str, Any]) -> UserProfileSummary:
+    desired_job = str(user_info.get("desired_job") or "미입력")
+
+    raw_career_years = user_info.get("career_years")
+    try:
+        career_years = int(raw_career_years) if raw_career_years is not None else 0
+    except (TypeError, ValueError):
+        career_years = 0
+
+    raw_skills = user_info.get("skills") or []
+    skills = [str(skill).strip() for skill in raw_skills if str(skill).strip()]
+
+    return UserProfileSummary(
+        desired_job=desired_job,
+        career_years=career_years,
+        skills=skills,
+    )
+
+
+async def quick_login(data: QuickLoginRequest) -> QuickLoginResponse:
+    try:
+        user_id = await create_quick_user(
+            user_name=data.user_name,
+            desired_job=data.desired_job,
+            career_years=data.career_years,
+            skills=data.skills,
+        )
+        user_info = await fetch_user_info(user_id)
+
+        user_name = str(user_info.get("username") or data.user_name)
+        return QuickLoginResponse(
+            user_id=user_id,
+            user_name=user_name,
+            user_profile=_to_user_profile(user_info),
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.error("V3 Quick Login Error: %s", error)
+        raise HTTPException(
+            status_code=500,
+            detail="로그인 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        ) from error
+
+
+def _build_user_query_text(user_profile: UserProfileSummary) -> str:
+    skills_text = ", ".join(user_profile.skills) if user_profile.skills else "없음"
+    return (
+        f"희망직무: {user_profile.desired_job}, "
+        f"보유기술: {skills_text}, "
+        f"경력: {user_profile.career_years}년"
+    )
+
+
 async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
     from langchain_core.output_parsers import JsonOutputParser
     from langchain_core.prompts import ChatPromptTemplate
 
     try:
         user_info = await fetch_user_info(user_id)
-        user_query_text = (
-            f"희망직무: {user_info['desired_job']}, "
-            f"보유기술: {', '.join(user_info['skills'] or [])}, "
-            f"경력: {user_info['career_years']}년"
-        )
+        user_profile = _to_user_profile(user_info)
+        user_query_text = _build_user_query_text(user_profile)
 
         resources = await _get_resources()
         embeddings = resources["embeddings"]
@@ -109,7 +158,9 @@ async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         points = search_result.points or []
         if not points:
             return RecommendationListResponse(
+                user_id=user_id,
                 user_name=user_info["username"],
+                user_profile=user_profile,
                 recommendations=[],
             )
 
@@ -158,14 +209,19 @@ async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
 
         scored_jobs = result.get("jobs", []) if isinstance(result, dict) else []
         return RecommendationListResponse(
+            user_id=user_id,
             user_name=user_info["username"],
+            user_profile=user_profile,
             recommendations=scored_jobs,
         )
     except HTTPException:
         raise
     except Exception as error:
         logger.error("V3 List Error: %s", error)
-        raise HTTPException(status_code=500, detail=str(error)) from error
+        raise HTTPException(
+            status_code=500,
+            detail="추천 결과를 준비하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        ) from error
 
 
 async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
@@ -174,10 +230,8 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
 
     try:
         user_info = await fetch_user_info(user_id)
-        user_query_text = (
-            f"희망직무: {user_info['desired_job']}, "
-            f"보유기술: {', '.join(user_info['skills'] or [])}"
-        )
+        user_profile = _to_user_profile(user_info)
+        user_query_text = _build_user_query_text(user_profile)
 
         resources = await _get_resources()
         qdrant_client = resources["qdrant_client"]
@@ -249,7 +303,10 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         raise
     except Exception as error:
         logger.error("V3 Detail Error: %s", error)
-        raise HTTPException(status_code=500, detail=str(error)) from error
+        raise HTTPException(
+            status_code=500,
+            detail="공고 분석 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        ) from error
 
 
 async def close_resources() -> None:

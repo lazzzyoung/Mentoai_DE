@@ -5,6 +5,7 @@ python-dotenv
 kafka-python
 
 # --- Data Engineering & DB ---
+pyspark==3.4.0
 psycopg2-binary
 boto3
 

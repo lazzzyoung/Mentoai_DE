@@ -14,7 +14,7 @@ pydantic
 langchain
 langchain-core
 langchain-community
-langchain-google-genai>=2.0.0
+langchain-openai
 
 # --- Vector DB ---
 langchain-qdrant

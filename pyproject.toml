@@ -3,20 +3,25 @@ name = "mentoai-de"
 version = "0.1.0"
 description = "MentoAI data engineering and RAG server project"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "asyncpg",
+    "beautifulsoup4",
     "fastapi",
+    "kafka-python",
     "langchain",
     "langchain-community",
     "langchain-core",
-    "langchain-google-genai>=2.0.0",
     "langchain-huggingface",
+    "langchain-openai",
     "langchain-qdrant",
+    "pendulum",
     "pydantic",
     "python-dotenv",
     "qdrant-client>=1.9.0",
+    "requests",
     "sentence-transformers",
+    "sqlalchemy",
     "uvicorn",
 ]
 
@@ -25,11 +30,12 @@ dev = [
     "pytest",
     "ruff",
     "ty",
+    "poethepoet",
 ]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 extend-exclude = [
     ".venv",
     ".uv-cache",
@@ -47,3 +53,224 @@ known-first-party = ["server", "kafka", "spark", "dags"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.poe.tasks]
+
+[tool.poe.tasks.install]
+help = "동일한 프로젝트 가상환경(의존성 포함) 동기화"
+cmd = "uv sync"
+
+[tool.poe.tasks.format]
+help = "코드 포맷 정리"
+cmd = "uv run ruff format server tests"
+
+[tool.poe.tasks.lint]
+help = "정적 린트 검사"
+cmd = "uv run ruff check server tests"
+
+[tool.poe.tasks.typecheck]
+help = "타입 검사"
+cmd = "uv run ty check server"
+
+[tool.poe.tasks.test]
+help = "테스트 실행"
+cmd = "uv run pytest"
+
+[tool.poe.tasks.check]
+help = "코드 퀄리티 전체(린트/타입/테스트) 체크"
+sequence = [
+  { cmd = "uv run ruff check server tests" },
+  { cmd = "uv run ty check server" },
+  { cmd = "uv run pytest" },
+]
+
+[tool.poe.tasks.all]
+help = "전체 점검(포맷/퀄리티/도커 빌드/헬스/간편가입 검증) 수행"
+sequence = [
+  { ref = "format" },
+  { ref = "check" },
+  { ref = "preflight" },
+  { ref = "docker-stop-if-running" },
+  { ref = "docker-build" },
+  { ref = "docker-ps" },
+  { ref = "smoke-test" },
+  { ref = "smoke-quick-login" },
+]
+
+[tool.poe.tasks.ci]
+help = "개발-최종 점검(포맷/퀄리티)"
+sequence = [
+  { cmd = "uv run ruff format --check server tests" },
+  { ref = "check" },
+]
+
+[tool.poe.tasks.run-server]
+help = "FastAPI 서버(개발 모드) 실행"
+cmd = "uv run uvicorn server.app.main:app --reload --host 0.0.0.0 --port 8000"
+
+[tool.poe.tasks.env-init]
+help = ".env 파일 생성 및 누락 키 보강(멱등)"
+shell = """
+bash -lc '
+if [ ! -f .env.example ]; then
+  echo ".env.example 파일이 없습니다."
+  exit 1
+fi
+
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo ".env 파일을 생성했습니다."
+else
+  echo ".env 파일이 이미 존재합니다. 누락 키를 점검합니다."
+fi
+
+python - <<'"'"'PY'"'"'
+from pathlib import Path
+
+env_path = Path(".env")
+lines = env_path.read_text().splitlines() if env_path.exists() else []
+kv = {}
+order = []
+for line in lines:
+    if not line or line.lstrip().startswith("#") or "=" not in line:
+        continue
+    k, v = line.split("=", 1)
+    if k not in kv:
+        order.append(k)
+    kv[k] = v
+
+defaults = {
+    "OPENAI_API_KEY": "your_openai_api_key",
+    "OPENAI_MODEL": "gpt-4o-mini",
+    "KAFKA_BOOTSTRAP_SERVERS": "kafka:29092",
+    "KAFKA_TOPIC_NAME": "career_raw",
+    "WANTED_BASE_URL": "https://www.wanted.co.kr",
+    "TARGET_JOB_GROUP": "",
+    "TARGET_JOB_ID": "",
+    "MINIO_ROOT_USER": "minioadmin",
+    "MINIO_ROOT_PASSWORD": "minioadmin",
+    "S3_ENDPOINT_URL": "http://minio:9000",
+    "S3_USE_SSL": "false",
+    "S3_PATH_STYLE_ACCESS": "true",
+}
+added = []
+for k, v in defaults.items():
+    if k not in kv:
+        kv[k] = v
+        order.append(k)
+        added.append(k)
+
+env_path.write_text("\\n".join(f"{k}={kv[k]}" for k in order) + "\\n")
+if added:
+    print("추가된 키:", ", ".join(added))
+else:
+    print("누락 키 없음")
+PY
+'
+"""
+
+[tool.poe.tasks.preflight]
+help = "도커/환경 파일 사전 점검"
+cmd = "bash -lc 'if [ ! -f .env ]; then echo \".env 파일이 필요합니다. README의 환경 변수 섹션을 먼저 설정하세요.\"; exit 1; fi; docker info >/dev/null 2>&1 || (echo \"Docker 데몬이 실행 중이어야 합니다.\" && exit 1)'"
+
+[tool.poe.tasks.airflow-clean-pid]
+help = "Airflow 웹서버 stale PID 파일 정리"
+shell = """
+python - <<'PY'
+from pathlib import Path
+
+pid_file = Path("airflow-webserver.pid")
+if pid_file.exists():
+    pid_file.unlink()
+    print("airflow-webserver.pid 제거 완료")
+else:
+    print("airflow-webserver.pid 없음")
+PY
+"""
+
+[tool.poe.tasks.docker-stop-if-running]
+help = "실행 중인 인프라 컨테이너가 있으면 먼저 종료"
+sequence = [
+  { ref = "airflow-clean-pid" },
+  { cmd = "bash -lc 'cd infra && if [ -n \"$(docker compose ps -q)\" ]; then echo \"실행 중인 컨테이너를 종료합니다.\"; docker compose down --remove-orphans; else echo \"실행 중인 컨테이너가 없습니다.\"; fi'" },
+]
+
+[tool.poe.tasks.docker-build]
+help = "인프라 전체 컨테이너 빌드 후 백그라운드 실행"
+shell = "cd infra && docker compose up -d --build --remove-orphans"
+
+[tool.poe.tasks.docker-up]
+help = "인프라 컨테이너 실행(이미지 빌드 없이)"
+shell = "cd infra && docker compose up -d --remove-orphans"
+
+[tool.poe.tasks.docker-down]
+help = "인프라 컨테이너 종료"
+cmd = "bash -lc 'cd infra && docker compose down --remove-orphans || true'"
+
+[tool.poe.tasks.docker-down-volumes]
+help = "볼륨 포함 종료(데이터 삭제 주의)"
+cmd = "bash -lc 'cd infra && docker compose down -v --remove-orphans || true'"
+
+[tool.poe.tasks.docker-ps]
+help = "인프라 컨테이너 상태 확인"
+shell = "cd infra && docker compose ps"
+
+[tool.poe.tasks.docker-logs]
+help = "인프라 로그 추적 (실행 시 종료: Ctrl+C)"
+shell = "cd infra && docker compose logs -f"
+
+[tool.poe.tasks.smoke-test]
+help = "실행 확인용 API 헬스체크"
+cmd = "bash -lc 'for i in {1..60}; do curl -fsS http://localhost:8000/health && exit 0; sleep 2; done; echo \"서버에 아직 연결되지 않았습니다.\"; exit 1'"
+
+[tool.poe.tasks.smoke-quick-login]
+help = "간편 로그인 API 동작 및 사용자 테이블 자동 초기화 확인"
+shell = """
+python - <<'PY'
+import json
+import time
+import urllib.error
+import urllib.request
+
+payload = {
+    "user_name": "poe-smoke-user",
+    "desired_job": "데이터 엔지니어",
+    "career_years": 1,
+    "skills": ["Python", "Spark"],
+}
+last_error = None
+for attempt in range(1, 31):
+    try:
+        request = urllib.request.Request(
+            "http://localhost:8000/api/v3/auth/quick-login",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+
+        user_id = int(body.get("user_id", 0))
+        if user_id < 1:
+            raise RuntimeError("간편 로그인 응답에서 user_id를 확인하지 못했습니다.")
+
+        print(f"quick-login ok (user_id={user_id})")
+        break
+    except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as exc:
+        last_error = exc
+        if attempt == 30:
+            raise SystemExit(f"quick-login 실패: {exc}") from exc
+        time.sleep(2)
+PY
+"""
+
+[tool.poe.tasks.docker-start]
+help = "Docker 인프라 실행 + 헬스체크 + 간편가입 스모크까지 순차 수행"
+sequence = [
+  { ref = "preflight" },
+  { ref = "docker-stop-if-running" },
+  { ref = "docker-build" },
+  { ref = "docker-ps" },
+  { ref = "smoke-test" },
+  { ref = "smoke-quick-login" },
+]

@@ -9,8 +9,8 @@ from utils.writers import write_raw_to_s3
 
 load_dotenv()
 
-kafka_bootstrap = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
-topic_name = os.getenv('KAFKA_TOPIC_NAME')
+kafka_bootstrap = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
+topic_name = os.getenv('KAFKA_TOPIC_NAME', 'career_raw')
 
 def run_ingest_bronze():
     spark = create_spark_session("MentoAI_Job1_Bronze")

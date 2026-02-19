@@ -8,9 +8,33 @@ client = TestClient(app)
 
 
 def test_health_check() -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "message": "MentoAI service is running"}
+
+
+def test_home_page_served() -> None:
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "message": "MentoAI Brain is running with Gemini"}
+    assert "Career Job Hub" in response.text
+
+    jobs_page = client.get("/jobs")
+    assert jobs_page.status_code == 200
+    assert "Career Job Hub" in jobs_page.text
+
+
+def test_recommend_and_detail_pages_accessible() -> None:
+    recommend = client.get("/jobs/recommend")
+    assert recommend.status_code == 200
+    assert "맞춤 추천 시작" in recommend.text
+
+    detail = client.get("/jobs/detail")
+    assert detail.status_code == 200
+    assert "공고 상세 분석" in detail.text
+
+    detail_with_id = client.get("/jobs/detail/123")
+    assert detail_with_id.status_code == 200
+    assert "공고 상세 분석" in detail_with_id.text
 
 
 def test_v1_v2_endpoints_removed() -> None:
@@ -24,7 +48,13 @@ def test_recommend_jobs_success(monkeypatch) -> None:
     async def fake_recommend(user_id: int):
         assert user_id == 1
         return {
+            "user_id": 1,
             "user_name": "테스트유저",
+            "user_profile": {
+                "desired_job": "데이터 엔지니어",
+                "career_years": 2,
+                "skills": ["Python", "Spark", "Kafka"],
+            },
             "recommendations": [
                 {
                     "job_id": 11,
@@ -42,7 +72,9 @@ def test_recommend_jobs_success(monkeypatch) -> None:
     response = client.post("/api/v3/jobs/recommend/1")
     assert response.status_code == 200
     data = response.json()
+    assert data["user_id"] == 1
     assert data["user_name"] == "테스트유저"
+    assert data["user_profile"]["desired_job"] == "데이터 엔지니어"
     assert len(data["recommendations"]) == 1
     assert data["recommendations"][0]["job_id"] == 11
 
@@ -56,6 +88,42 @@ def test_recommend_jobs_not_found(monkeypatch) -> None:
     response = client.post("/api/v3/jobs/recommend/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "User not found"
+
+
+def test_quick_login_success(monkeypatch) -> None:
+    async def fake_quick_login(payload):
+        assert payload.user_name == "홍길동"
+        assert payload.desired_job == "백엔드"
+        assert payload.career_years == 3
+        assert payload.skills == ["Python", "FastAPI"]
+        return {
+            "user_id": 77,
+            "user_name": "홍길동",
+            "user_profile": {
+                "desired_job": "백엔드",
+                "career_years": 3,
+                "skills": ["Python", "FastAPI"],
+            },
+        }
+
+    monkeypatch.setattr(v3_routes.rag_v3_service, "quick_login", fake_quick_login)
+
+    response = client.post(
+        "/api/v3/auth/quick-login",
+        json={
+            "user_name": "홍길동",
+            "desired_job": "백엔드",
+            "career_years": 3,
+            "skills": ["Python", "FastAPI"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_id"] == 77
+    assert data["user_name"] == "홍길동"
+    assert data["user_profile"]["desired_job"] == "백엔드"
+    assert data["user_profile"]["skills"] == ["Python", "FastAPI"]
 
 
 def test_analyze_job_detail_success(monkeypatch) -> None:

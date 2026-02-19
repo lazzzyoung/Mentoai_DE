@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>공고 상세 분석</title>
+    <link rel="stylesheet" href="/static/css/jobsite.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="logo" href="/">Career Job Hub</a>
+        <nav class="top-nav">
+          <a href="/" data-nav="home">채용 홈</a>
+          <a href="/jobs/recommend" data-nav="recommend">맞춤 추천</a>
+          <a href="/jobs/detail" data-nav="detail">공고 상세 분석</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="detail-page">
+      <section class="panel detail-form-panel">
+        <h2>공고 상세 분석</h2>
+        <p class="helper">
+          추천 화면에서 선택한 공고를 자동으로 불러옵니다. 최근 본 공고가 있으면 바로 분석할 수 있어요.
+        </p>
+
+        <article id="recent-selection" class="recent-selection hidden">
+          <p class="feature-eyebrow">최근 선택 공고</p>
+          <h3 id="recent-job-title">-</h3>
+          <p id="recent-job-meta" class="subtle">-</p>
+          <button id="analyze-selected-btn" type="button">이 공고 분석하기</button>
+        </article>
+
+        <details class="manual-entry">
+          <summary>다른 공고 번호로 직접 분석</summary>
+          <form id="analysis-form" class="detail-form">
+            <label for="analysis-job-id">공고 번호</label>
+            <input id="analysis-job-id" type="number" min="1" placeholder="예: 123" />
+            <button type="submit">분석 시작</button>
+          </form>
+        </details>
+
+        <p id="detail-login-guide" class="mini-status"></p>
+        <div id="detail-status" class="status-message" aria-live="polite">
+          추천 화면에서 공고를 선택하면 자동으로 분석됩니다.
+        </div>
+
+        <div class="home-actions">
+          <a href="/jobs/recommend" class="btn-ghost">추천 페이지로 이동</a>
+          <a href="/" class="btn-ghost">메인으로</a>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>분석 결과</h2>
+        <div id="analysis-empty" class="empty">분석할 공고를 선택해 주세요.</div>
+
+        <article id="analysis-result" class="hidden">
+          <div class="analysis-title-row">
+            <h3 id="analysis-job-title">-</h3>
+            <span id="analysis-score-chip" class="score-chip">0점</span>
+          </div>
+          <p id="analysis-company" class="subtle">-</p>
+
+          <section class="detail-section">
+            <h4>요약</h4>
+            <p id="analysis-summary">-</p>
+          </section>
+
+          <section class="detail-section">
+            <h4>필요한 역량</h4>
+            <div id="analysis-stacks" class="stack-list"></div>
+          </section>
+
+          <section class="detail-section">
+            <h4>실천 과제</h4>
+            <div id="analysis-actions" class="action-list"></div>
+          </section>
+
+          <section class="detail-section">
+            <h4>면접 팁</h4>
+            <p id="analysis-tip">-</p>
+          </section>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const path = window.location.pathname;
+      const navLinks = document.querySelectorAll("[data-nav]");
+      navLinks.forEach((link) => link.classList.remove("is-active"));
+
+      const navMap = {
+        home: /^(\/|\/jobs\/?)$/,
+        recommend: /^\/jobs\/recommend\/?$/,
+        detail: /^\/jobs\/detail(\/\d+)?\/?$/,
+      };
+
+      for (const [key, matcher] of Object.entries(navMap)) {
+        if (matcher.test(path)) {
+          const target = document.querySelector(`[data-nav="${key}"]`);
+          if (target) {
+            target.classList.add("is-active");
+          }
+          break;
+        }
+      }
+    </script>
+    <script type="module" src="/static/js/detail.js"></script>
+  </body>
+</html>

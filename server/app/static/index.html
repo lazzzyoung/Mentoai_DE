@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>맞춤 공고 찾기</title>
+    <link rel="stylesheet" href="/static/css/jobsite.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="logo" href="/">Career Job Hub</a>
+        <nav class="top-nav">
+          <a href="/" data-nav="home">채용 홈</a>
+          <a href="/jobs/recommend" data-nav="recommend">맞춤 추천</a>
+          <a href="/jobs/detail" data-nav="detail">공고 분석</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="panel profile-panel">
+        <h2>맞춤 추천 시작</h2>
+        <p class="helper">
+          프로필을 등록하면 내 조건에 맞는 공고를 자동으로 추천해드려요.
+        </p>
+
+        <div class="session-quick-zone">
+          <button id="continue-session-btn" type="button" class="session-cta-btn">
+            최근 프로필로 바로 추천 보기
+          </button>
+          <p id="session-empty-hint" class="mini-status">처음 이용이라면 아래에서 프로필을 입력해 주세요.</p>
+        </div>
+
+        <form id="user-form" class="user-form">
+          <details class="quick-signup" id="quick-signup-area" open>
+            <summary>프로필 입력</summary>
+            <div class="quick-signup-grid">
+              <label for="user-name-input">이름(필수)</label>
+              <input id="user-name-input" type="text" maxlength="32" placeholder="예: 김민수" required />
+
+              <label for="desired-job-input">희망 직무</label>
+              <input id="desired-job-input" type="text" maxlength="50" placeholder="예: 데이터 엔지니어" />
+
+              <label for="career-years-input">경력(년)</label>
+              <input id="career-years-input" type="number" min="0" placeholder="예: 2" />
+
+              <label for="skills-input">보유 기술(쉼표 구분)</label>
+              <input id="skills-input" type="text" maxlength="120" placeholder="예: Python, Spark, Kafka" />
+            </div>
+          </details>
+
+          <div class="input-row">
+            <button type="submit">프로필 저장하고 추천 보기</button>
+            <button id="clear-session-btn" type="button" class="ghost-btn">프로필 초기화</button>
+          </div>
+        </form>
+
+        <div id="status-message" class="status-message" aria-live="polite">프로필을 확인하는 중...</div>
+        <p id="session-badge" class="session-badge hidden" aria-live="polite"></p>
+
+        <ol id="pipeline-steps" class="pipeline-steps">
+          <li data-step="1">1) 프로필 확인</li>
+          <li data-step="2">2) 내 정보 불러오기</li>
+          <li data-step="3">3) 매칭 기준 정리</li>
+          <li data-step="4">4) 추천 공고 표시</li>
+        </ol>
+
+        <article id="user-profile-card" class="user-profile hidden">
+          <h3>현재 프로필</h3>
+          <p><strong>이름:</strong> <span id="profile-name">-</span></p>
+          <p><strong>희망 직무:</strong> <span id="profile-desired-job">-</span></p>
+          <p><strong>경력:</strong> <span id="profile-career">-</span></p>
+          <p><strong>보유 역량:</strong> <span id="profile-skills">-</span></p>
+        </article>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="panel-title-row">
+          <h2>추천 포지션</h2>
+          <span id="job-count" class="count-chip">0건</span>
+        </div>
+
+        <div class="job-metrics" aria-live="polite">
+          <div class="job-metric-card">
+            <span>평균 적합도</span>
+            <strong id="avg-match-score">0점</strong>
+          </div>
+          <div class="job-metric-card">
+            <span>최고 적합도</span>
+            <strong id="top-match-score">0점</strong>
+          </div>
+        </div>
+
+        <div id="job-toolbar" class="job-toolbar">
+          <div class="toolbar-row">
+            <label for="job-search-input" class="sr-only">공고 검색</label>
+            <input
+              id="job-search-input"
+              class="job-search-input"
+              type="text"
+              placeholder="회사명/공고명으로 검색"
+            />
+            <button id="job-search-reset" type="button">초기화</button>
+          </div>
+
+          <div class="toolbar-row toolbar-secondary">
+            <label class="toolbar-select-wrap">
+              정렬
+              <select id="job-sort-select">
+                <option value="score-desc">적합도 높은 순</option>
+                <option value="score-asc">적합도 낮은 순</option>
+                <option value="company-asc">회사명 가나다순</option>
+                <option value="title-asc">공고명 가나다순</option>
+                <option value="title-desc">공고명 역순</option>
+              </select>
+            </label>
+
+            <label class="toolbar-select-wrap">
+              표시 개수
+              <select id="job-page-size-select">
+                <option value="5">5개</option>
+                <option value="10">10개</option>
+                <option value="20">20개</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div id="job-list" class="job-list empty">프로필을 등록하면 추천 공고가 표시됩니다.</div>
+        <div id="job-pagination" class="job-pagination">
+          <button id="job-prev-page" type="button">이전</button>
+          <span id="job-page-info">0 / 0</span>
+          <button id="job-next-page" type="button">다음</button>
+        </div>
+
+        <div class="bookmark-panel">
+          <div class="panel-title-row">
+            <h3>관심 공고</h3>
+            <button id="bookmark-clear" class="bookmark-clear-btn" type="button">전체 삭제</button>
+          </div>
+          <div id="bookmark-list" class="bookmark-list empty">저장된 관심 공고가 없습니다.</div>
+        </div>
+
+        <p class="panel-footer-note">
+          공고 카드를 누르면 오른쪽 미리보기에서 확인하고, 전체 분석 화면으로 이어서 볼 수 있습니다.
+        </p>
+      </section>
+
+      <section class="panel detail-panel">
+        <h2>공고 미리보기</h2>
+        <div id="detail-placeholder" class="empty">
+          왼쪽에서 추천 공고를 선택하면 상세 요약이 표시됩니다.
+        </div>
+
+        <article id="detail-content" class="hidden">
+          <h3 id="detail-title">-</h3>
+          <p id="detail-company" class="subtle">-</p>
+
+          <div class="score-box">
+            <span>나와의 적합도</span>
+            <strong><span id="detail-score">0</span> / 100</strong>
+          </div>
+
+          <section class="detail-section">
+            <h4>요약</h4>
+            <p id="detail-summary">-</p>
+          </section>
+
+          <section class="detail-section">
+            <h4>필요한 역량</h4>
+            <div id="detail-stacks" class="stack-list"></div>
+          </section>
+
+          <section class="detail-section">
+            <h4>실천 과제</h4>
+            <div id="detail-actions" class="action-list"></div>
+          </section>
+
+          <section class="detail-section">
+            <h4>면접 팁</h4>
+            <p id="detail-tip">-</p>
+          </section>
+        </article>
+
+        <a id="go-detail-page" class="btn-ghost job-detail-link hidden" href="/jobs/detail">전체 분석으로 이어보기</a>
+      </section>
+    </main>
+
+    <script>
+      const path = window.location.pathname;
+      const navLinks = document.querySelectorAll("[data-nav]");
+      navLinks.forEach((link) => link.classList.remove("is-active"));
+
+      const navMap = {
+        home: /^(\/|\/jobs\/?)$/,
+        recommend: /^\/jobs\/recommend\/?$/,
+        detail: /^\/jobs\/detail(\/\d+)?\/?$/,
+      };
+
+      for (const [key, matcher] of Object.entries(navMap)) {
+        if (matcher.test(path)) {
+          const target = document.querySelector(`[data-nav="${key}"]`);
+          if (target) {
+            target.classList.add("is-active");
+          }
+          break;
+        }
+      }
+    </script>
+    <script src="/static/js/jobsite.js" type="module"></script>
+  </body>
+</html>

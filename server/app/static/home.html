@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Career Job Hub</title>
+    <link rel="stylesheet" href="/static/css/jobsite.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="logo" href="/">Career Job Hub</a>
+        <nav class="top-nav">
+          <a href="/" data-nav="home">채용 홈</a>
+          <a href="/jobs/recommend" data-nav="recommend">맞춤 추천</a>
+          <a href="/jobs/detail" data-nav="detail">공고 상세 분석</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="home-page">
+      <section class="hero-card">
+        <p class="hero-badge">채용 포털 스타일</p>
+        <h1>내 조건에 맞는 공고를 빠르게 찾고 준비해보세요</h1>
+        <p>
+          프로필을 한 번 입력하면 추천부터 상세 준비 가이드까지 자연스럽게 이어서 볼 수 있습니다.
+        </p>
+        <div class="hero-actions">
+          <a href="/jobs/recommend" class="btn-primary">맞춤 공고 추천 시작</a>
+          <a href="/jobs/detail" class="btn-ghost">공고 분석 화면으로 이동</a>
+        </div>
+      </section>
+
+      <section class="home-grid">
+        <article class="home-feature-card">
+          <p class="feature-eyebrow">맞춤 추천</p>
+          <h2>공고 추천</h2>
+          <p>
+            등록된 프로필을 기준으로 내 조건과 맞는 공고를 선별하고, 적합도와 추천 이유를 한눈에
+            보여드립니다.
+          </p>
+          <ul>
+            <li>회사/직무/적합도 기준 탐색</li>
+            <li>관심 공고 저장 후 이어보기</li>
+            <li>클릭 즉시 상세 요약 확인</li>
+          </ul>
+          <a class="inline-link" href="/jobs/recommend">추천 페이지로 이동</a>
+        </article>
+
+        <article class="home-feature-card">
+          <p class="feature-eyebrow">간편 시작</p>
+          <h2>빠른 로그인</h2>
+          <p>
+            처음 이용해도 이름과 희망 직무만 입력하면 바로 시작할 수 있어요.
+            다음 방문부터는 최근 프로필로 바로 이어집니다.
+          </p>
+          <p id="home-session-hint" class="mini-status">프로필을 입력해 시작해 주세요.</p>
+          <form id="quick-home-login-form" class="detail-shortcut">
+            <label for="home-user-name">이름</label>
+            <input id="home-user-name" type="text" maxlength="32" placeholder="예: 김민수" required />
+            <label for="home-desired-job">희망 직무</label>
+            <input id="home-desired-job" type="text" maxlength="50" placeholder="예: 데이터 엔지니어" />
+            <label for="home-career-years">경력(년)</label>
+            <input id="home-career-years" type="number" min="0" placeholder="예: 2" />
+            <label for="home-skills">보유 기술(쉼표 구분)</label>
+            <input id="home-skills" type="text" maxlength="120" placeholder="예: Python, Spark, Kafka" />
+            <button type="submit">로그인하고 추천 보기</button>
+            <p id="home-login-status" class="status-message" aria-live="polite"></p>
+          </form>
+        </article>
+
+        <article class="home-feature-card">
+          <p class="feature-eyebrow">이어보기</p>
+          <h2>최근 본 공고</h2>
+          <p>
+            추천 화면에서 선택했던 공고를 상세 분석 화면에서 이어서 확인할 수 있습니다.
+          </p>
+          <div class="recent-job-box">
+            <p id="home-recent-job-title" class="recent-job-title">최근 본 공고가 아직 없어요.</p>
+            <p id="home-recent-job-meta" class="subtle">추천 화면에서 공고를 선택해 보세요.</p>
+          </div>
+          <div class="link-row">
+            <a id="home-recent-detail-link" class="btn-ghost" href="/jobs/detail">최근 공고 이어보기</a>
+            <a class="btn-soft" href="/jobs/recommend">추천 화면으로 이동</a>
+          </div>
+          <p id="home-recent-status" class="mini-status">최근 선택 공고를 자동으로 연결해 드려요.</p>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const USER_SESSION_STORAGE_KEY = "mentoai_last_user_session_v1";
+      const LAST_SELECTED_JOB_STORAGE_KEY = "mentoai_last_selected_job_v1";
+
+      const path = window.location.pathname;
+      const navLinks = document.querySelectorAll("[data-nav]");
+      navLinks.forEach((link) => link.classList.remove("is-active"));
+
+      const navMap = {
+        home: /^(\/|\/jobs\/?)$/,
+        recommend: /^\/jobs\/recommend\/?$/,
+        detail: /^\/jobs\/detail(\/\d+)?\/?$/,
+      };
+
+      for (const [key, matcher] of Object.entries(navMap)) {
+        if (matcher.test(path)) {
+          const target = document.querySelector(`[data-nav="${key}"]`);
+          if (target) {
+            target.classList.add("is-active");
+          }
+          break;
+        }
+      }
+
+      const quickHomeLoginForm = document.getElementById("quick-home-login-form");
+      const homeUserName = document.getElementById("home-user-name");
+      const homeDesiredJob = document.getElementById("home-desired-job");
+      const homeCareerYears = document.getElementById("home-career-years");
+      const homeSkills = document.getElementById("home-skills");
+      const homeLoginStatus = document.getElementById("home-login-status");
+      const homeSessionHint = document.getElementById("home-session-hint");
+      const homeRecentJobTitle = document.getElementById("home-recent-job-title");
+      const homeRecentJobMeta = document.getElementById("home-recent-job-meta");
+      const homeRecentStatus = document.getElementById("home-recent-status");
+      const homeRecentDetailLink = document.getElementById("home-recent-detail-link");
+
+      const parseSkills = (value) =>
+        (value || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0);
+
+      const loadUserSession = () => {
+        try {
+          const raw = window.localStorage?.getItem(USER_SESSION_STORAGE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          const userId = Number(parsed?.user_id);
+          if (!Number.isFinite(userId) || userId < 1) return null;
+          return parsed;
+        } catch {
+          return null;
+        }
+      };
+
+      const loadLastJob = () => {
+        try {
+          const raw = window.localStorage?.getItem(LAST_SELECTED_JOB_STORAGE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          const jobId = Number(parsed?.job_id);
+          if (!Number.isFinite(jobId) || jobId < 1) return null;
+          return parsed;
+        } catch {
+          return null;
+        }
+      };
+
+      const session = loadUserSession();
+      if (session) {
+        const desiredJob = session?.user_profile?.desired_job || "희망 직무 미입력";
+        homeSessionHint.textContent = `최근 프로필: ${session.user_name || "회원"} (${desiredJob})`;
+        if (!homeUserName.value && session.user_name) {
+          homeUserName.value = session.user_name;
+        }
+        if (!homeDesiredJob.value && session?.user_profile?.desired_job) {
+          homeDesiredJob.value = session.user_profile.desired_job;
+        }
+      }
+
+      const recentJob = loadLastJob();
+      if (recentJob) {
+        homeRecentJobTitle.textContent = recentJob.title || "최근 선택한 공고";
+        homeRecentJobMeta.textContent = recentJob.company || "회사 정보 없음";
+        homeRecentStatus.textContent = "상세 분석 페이지에서 바로 이어볼 수 있어요.";
+      } else {
+        homeRecentJobTitle.textContent = "최근 본 공고가 아직 없어요.";
+        homeRecentJobMeta.textContent = "추천 화면에서 공고를 선택하면 자동 저장됩니다.";
+        homeRecentStatus.textContent = "먼저 추천 화면에서 공고를 확인해 주세요.";
+      }
+
+      homeRecentDetailLink?.addEventListener("click", (event) => {
+        const hasRecent = Boolean(loadLastJob());
+        if (hasRecent) return;
+        event.preventDefault();
+        window.location.href = "/jobs/recommend";
+      });
+
+      quickHomeLoginForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const userName = homeUserName?.value?.trim();
+        if (!userName) {
+          if (homeLoginStatus) {
+            homeLoginStatus.textContent = "이름을 입력해 주세요.";
+          }
+          return;
+        }
+
+        if (homeLoginStatus) {
+          homeLoginStatus.textContent = "로그인 처리 중...";
+        }
+
+        try {
+          const response = await fetch("/api/v3/auth/quick-login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_name: userName,
+              desired_job: homeDesiredJob?.value?.trim() || "미입력",
+              career_years: Number(homeCareerYears?.value || 0),
+              skills: parseSkills(homeSkills?.value),
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error();
+          }
+
+          window.localStorage?.setItem(
+            USER_SESSION_STORAGE_KEY,
+            JSON.stringify({
+              user_id: data.user_id,
+              user_name: data.user_name,
+              user_profile: data.user_profile ?? null,
+              last_login_at: Date.now(),
+            }),
+          );
+          window.location.href = "/jobs/recommend";
+        } catch {
+          if (homeLoginStatus) {
+            homeLoginStatus.textContent =
+              "로그인 처리에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

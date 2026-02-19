@@ -31,7 +31,7 @@
 +--------+                 ^
                            |
                  +------------------+
-                 |   Google Gemini  |
+                 |      OpenAI      |
                  |  (Reasoning/LLM) |
                  +------------------+
 
@@ -46,7 +46,7 @@
    - Qdrant 벡터 데이터베이스와 **KoSimCSE** 임베딩 모델을 사용하여, 단순 키워드 매칭이 아닌 문맥 기반의 직무 적합성 검색을 수행합니다.
 
 3. **RAG Based Consulting**
-   - **Google Gemini 3 Flash** 모델을 활용하여, 검색된 공고와 사용자 프로필을 비교 분석합니다.
+   - **OpenAI Chat Model**을 활용하여, 검색된 공고와 사용자 프로필을 비교 분석합니다.
    - 부족한 역량에 대한 점수화(Scoring) 및 구체적인 학습 로드맵(Gap Analysis)을 제공합니다.
 
 ## 🏗️ System Architecture (Medallion Architecture)
@@ -86,7 +86,7 @@ MENTOAI_DE/
 │   ├── airflow/                # Airflow 빌드 설정
 │   ├── spark/                  # Spark 빌드 설정
 │   └── docker-compose.yml      # 전체 서비스 오케스트레이션
-├── .env                        # 환경 변수 (AWS Key, Gemini Key, DB Info)
+├── .env                        # 환경 변수 (AWS/MinIO, OpenAI Key, DB Info)
 └── README.md                   # 본 문서
 
 ## 📡 API Endpoints
@@ -94,6 +94,11 @@ MENTOAI_DE/
 ### 1. 기업 목록 추천
 * **POST** `/api/v3/jobs/recommend/{user_id}`
 * 사용자의 프로필(기술, 경력)과 가장 유사한 공고 5개를 추천하고, 적합도 점수를 반환합니다.
+
+### 1-1. 간편 로그인(신규 사용자)
+* **POST** `/api/v3/auth/quick-login`
+* 이름/희망 직무/경력/보유 기술만 받아 사용자 정보를 생성하고 `user_id`를 즉시 발급합니다.
+* 생성된 `user_id`를 기준으로 위 추천 API를 바로 호출할 수 있습니다.
 
 ### 2. 상세 커리어 컨설팅
 * **POST** `/api/v3/jobs/{job_id}/analyze/{user_id}`
@@ -104,10 +109,10 @@ MENTOAI_DE/
 이 프로젝트를 실행하기 위해 필요한 요구사항입니다.
 
 * Docker & Docker Compose
-* Python 3.9+
+* Python 3.11+
 * API Keys:
-    * Google Gemini API Key
-    * AWS Access Key (S3 접근용)
+    * OpenAI API Key
+    * (선택) AWS Access Key (S3를 직접 사용할 때만)
 
 ---
 
@@ -115,13 +120,16 @@ MENTOAI_DE/
 
 ### 1. 환경 설정 (Prerequisites)
 프로젝트 루트에 `.env` 파일을 생성하고 필요한 API 키를 입력합니다.
-(GOOGLE_API_KEY, AWS_ACCESS_KEY_ID, POSTGRES_USER, QDRANT_HOST 등)
+(기본 로컬 실행은 MinIO 사용: OPENAI_API_KEY, MINIO_ROOT_USER, POSTGRES_USER, QDRANT_HOST 등)
+`.env` 파일이 없다면 `poe env-init`으로 기본 파일을 먼저 만들 수 있습니다.
 
 ### 2. 인프라 빌드 및 실행
 각 서비스(Airflow, Spark, Server)를 개별 Dockerfile로 빌드하여 실행합니다.
 
+```bash
 cd infra
 docker compose up -d --build
+```
 
 ### 3. 데이터 파이프라인 실행
 Airflow 웹 UI에 접속하여 파이프라인을 활성화합니다.
@@ -138,52 +146,46 @@ FastAPI Swagger UI를 통해 추천 및 컨설팅 API를 테스트할 수 있습
 ### 1. 환경 변수 설정
 프로젝트 루트 디렉토리에 .env 파일을 생성하고 아래 내용을 채워주세요.
 
+```bash
 # .env 예시
-GOOGLE_API_KEY=your_gemini_key
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-4o-mini
+AWS_ACCESS_KEY_ID=minioadmin
+AWS_SECRET_ACCESS_KEY=minioadmin
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
 S3_BUCKET_NAME=mentoai-career-raw
+S3_ENDPOINT_URL=http://minio:9000
+S3_USE_SSL=false
+S3_PATH_STYLE_ACCESS=true
+KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+KAFKA_TOPIC_NAME=career_raw
+WANTED_BASE_URL=https://www.wanted.co.kr
 DATABASE_URL=postgresql://airflow:airflow@postgres:5432/mentoai
 QDRANT_HOST=mentoai-qdrant
+```
 
 ### 2. 인프라 빌드 및 실행
 infra 디렉토리로 이동하여 모든 서비스를 실행합니다.
 
+```bash
 cd infra
-/ docker compose up -d --build
+docker compose up -d --build
+```
 
-### 3. 데이터베이스 초기화 (User Data)
-PostgreSQL 컨테이너에 접속하여 사용자 테이블을 생성하고 테스트 데이터를 입력합니다.
+MinIO 콘솔: `http://localhost:9001` (기본 `minioadmin / minioadmin`)
 
-# Postgres 접속
-/ docker exec -it mentoai-postgres psql -U airflow -d mentoai
+### 3. 초기 계정 생성 (수동 테이블 생성 불필요)
+사용자 테이블(`users`, `user_specs`)은 **첫 가입 요청 시 자동 생성**됩니다.  
+즉, Postgres에 직접 접속해 SQL을 수동 실행할 필요가 없습니다.
 
-# 테이블 생성 SQL 실행
-/ CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```bash
+curl -X 'POST' 'http://localhost:8000/api/v3/auth/quick-login' \
+  -H 'accept: application/json' -H 'Content-Type: application/json' \
+  -d '{"user_name":"홍길동","desired_job":"데이터 엔지니어","career_years":2,"skills":["Python","Spark","Kafka"]}'
+```
 
-/ CREATE TABLE IF NOT EXISTS user_specs (
-    spec_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    desired_job VARCHAR(100),
-    career_years INT DEFAULT 0,
-    education VARCHAR(100),
-    skills TEXT[],
-    certificates TEXT[],
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-# 테스트 데이터 입력
-/ INSERT INTO users (username, email) VALUES ('강태영', 'tang0923@khu.ac.kr');
-
-/ INSERT INTO user_specs (user_id, desired_job, career_years, education, skills, certificates) 
-VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airflow'], ARRAY['정보처리기사', 'SQLD']);
-
-# 입력 후 \q 로 종료
+응답으로 받은 `user_id`를 추천/상세 분석 API에 그대로 사용하면 됩니다.
 
 ### 4. 데이터 파이프라인 실행 (Airflow)
 1. 웹 브라우저에서 http://localhost:8081 접속
@@ -195,11 +197,26 @@ VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airf
 ### 5. API 테스트
 파이프라인이 완료되면 RAG 서버가 준비됩니다. http://localhost:8000/docs 에 접속하거나 아래 명령어로 테스트하세요.
 
+```bash
 # 1. 기업 추천 목록 조회 (V3)
-/ curl -X 'POST' 'http://localhost:8000/api/v3/jobs/recommend/1' -H 'accept: application/json' -d ''
+curl -X 'POST' 'http://localhost:8000/api/v3/jobs/recommend/1' -H 'accept: application/json' -d ''
 
 # 2. 특정 기업 상세 컨설팅 (job_id는 위 응답에서 확인)
-/ curl -X 'POST' 'http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1' -H 'accept: application/json' -d ''
+curl -X 'POST' 'http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1' -H 'accept: application/json' -d ''
+
+# 3. 일반 사용자용 간편 로그인 (신규 유저 생성 + 테이블 자동 초기화)
+curl -X 'POST' 'http://localhost:8000/api/v3/auth/quick-login' \
+  -H 'accept: application/json' -H 'Content-Type: application/json' \
+  -d '{"user_name":"홍길동","desired_job":"데이터 엔지니어","career_years":2,"skills":["Python","Spark","Kafka"]}'
+```
+
+## 6. UI 페이지 접속
+
+* 메인(채용 홈): `http://localhost:8000/`
+* AI 추천 화면(API1): `http://localhost:8000/jobs/recommend`
+* 공고 상세 화면(API2): `http://localhost:8000/jobs/detail`
+  * 공고 ID가 정해져 있으면 `http://localhost:8000/jobs/detail/{job_id}?user_id={user_id}`로 직접 접근 가능합니다.
+* 서비스 상태 확인: `http://localhost:8000/health`
 
 ---
 
@@ -216,19 +233,57 @@ VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airf
 **Storage**
 * PostgreSQL: 정형 데이터(사용자 정보, 정제된 공고) 저장
 * Qdrant: 공고 텍스트 임베딩 벡터 저장 및 유사도 검색
-* AWS S3: Raw Data(JSON/Parquet) 영구 보관 (Data Lake)
+* MinIO(로컬) / AWS S3(선택): Raw Data(JSON/Parquet) 영구 보관 (Data Lake)
 
 **AI & Backend**
 * FastAPI: 비동기 API 서버
 * LangChain: LLM 프롬프트 체이닝 및 Output Parsing
-* Google Gemini 3 Flash: 추론 및 로드맵 생성
+* OpenAI Chat Model: 추론 및 로드맵 생성
 * KoSimCSE: 한국어 특화 문장 임베딩 모델
 
 ---
 
-## 🧪 Development Quality Tools (uv / ruff / ty)
+## 🧪 Development Quality Tools (uv / ruff / ty / poe)
 
-프로젝트 루트에서 아래 명령으로 개발 품질 검사를 수행할 수 있습니다.
+### Poe 설치
+
+```bash
+uv tool install poethepoet
+
+# 실행이 안 될 경우(권장)
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Poe로 자주 쓰는 작업 실행
+
+- `poe install` : 의존성 동기화 (`uv sync`)
+- `poe env-init` : `.env.example` 기반으로 `.env` 파일 생성(없을 때만)
+- `poe format` : 코드 포맷 정리
+- `poe lint` : 린트 검사 (`ruff check`)
+- `poe typecheck` : 타입 검사 (`ty check`)
+- `poe test` : 테스트 실행 (`pytest`)
+- `poe check` : 린트 + 타입 + 테스트(전체 품질 점검)
+- `poe preflight` : `.env` 존재 여부 + Docker 실행 상태 사전 점검
+- `poe docker-stop-if-running` : 실행 중인 인프라 컨테이너가 있으면 먼저 종료
+- `poe smoke-quick-login` : 간편 로그인 API 스모크(사용자 테이블 자동 초기화 포함) 검증
+- `poe docker-start` : `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login` 순차 실행
+- `poe all` : `format` + `check` + `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login`를 순서대로 수행
+  - 실행 전 `Docker Desktop 실행` 및 프로젝트 루트 `.env` 파일 준비가 필요합니다.
+  - `.env`가 없다면 `poe env-init` 실행 후 값부터 채워주세요.
+- `poe ci` : 포맷 체크 + `check` 전체
+- `poe run-server` : FastAPI 개발 서버 실행
+- `poe smoke-test` : 로컬 서버 헬스 체크
+
+### 인프라/도커 작업
+
+- `poe docker-build` : `cd infra && docker compose up -d --build --remove-orphans`
+- `poe docker-up` : `cd infra && docker compose up -d --remove-orphans`
+- `poe docker-down` : `cd infra && docker compose down --remove-orphans` (멱등 실행 가능)
+- `poe docker-down-volumes` : `cd infra && docker compose down -v --remove-orphans`
+- `poe docker-ps` : `cd infra && docker compose ps`
+- `poe docker-logs` : `cd infra && docker compose logs -f`
+
+### 기존 명령 직접 실행 (참고)
 
 ```bash
 # 의존성 동기화
@@ -268,7 +323,7 @@ uv run pytest
 * **원인**: LangChain의 `vector_store`가 Qdrant의 특정 페이로드 필드를 읽어오지 못하는 호환성 문제.
 * **해결**: Qdrant Raw Client를 사용하여 검색된 ID로 직접 포인트(Point)를 조회(`retrieve`)하여 페이로드를 확실하게 가져오도록 보정.
 
-### 5. Gemini JSON Parsing 에러 (Output Parser)
+### 5. LLM JSON Parsing 에러 (Output Parser)
 * **현상**: V3 목록 조회 시 500 Internal Server Error 발생.
 * **원인**: `JsonOutputParser`가 `List[JobSummary]` 형태를 직접 처리하지 못함.
 * **해결**: 리스트를 감싸는 래퍼 클래스(`JobSummaryList`)를 정의하여 파서에게 전달함으로써 스키마 정합성 확보.
