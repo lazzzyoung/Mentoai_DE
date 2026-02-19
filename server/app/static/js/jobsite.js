@@ -481,13 +481,21 @@ const renderBookmarks = () => {
   });
 };
 
-const renderDetail = (detail) => {
+const renderDetail = (detail, selectedJob = null) => {
   detailPlaceholder.classList.add("hidden");
   detailContent.classList.remove("hidden");
 
+  const selectedScore = Number(selectedJob?.match_score);
+  const analysisScore = Number(detail.current_score);
+  const displayScore = Number.isFinite(selectedScore)
+    ? selectedScore
+    : Number.isFinite(analysisScore)
+      ? analysisScore
+      : 0;
+
   detailTitle.textContent = detail.job_title ?? "-";
   detailCompany.textContent = detail.company_name ?? "-";
-  detailScore.textContent = String(detail.current_score ?? 0);
+  detailScore.textContent = String(displayScore);
   detailSummary.textContent = detail.analysis_summary ?? "-";
   detailTip.textContent = detail.interview_tip ?? "-";
 
@@ -558,7 +566,7 @@ const fetchJobDetail = async (job) => {
       }
       throw new Error(data?.detail ?? "공고 분석 요청에 실패했습니다.");
     }
-    renderDetail(data);
+    renderDetail(data, job);
   } catch (error) {
     console.error("[job-detail-error]", error);
     detailPlaceholder.classList.remove("hidden");
