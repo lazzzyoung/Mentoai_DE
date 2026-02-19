@@ -226,6 +226,26 @@ VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airf
 
 ---
 
+## 🧪 Development Quality Tools (uv / ruff / ty)
+
+프로젝트 루트에서 아래 명령으로 개발 품질 검사를 수행할 수 있습니다.
+
+```bash
+# 의존성 동기화
+uv sync
+
+# 린트 검사
+uv run ruff check server tests
+
+# 타입 검사
+uv run ty check server
+
+# 테스트 실행
+uv run pytest
+```
+
+---
+
 ## ⚠️ Troubleshooting (Project History)
 
 ### 1. Airflow RBAC 권한 오류 (Access Denied)

@@ -1,0 +1,33 @@
+name: CI Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Ruff
+        run: uv run --no-project --with ruff ruff check server tests
+
+      - name: Ty
+        run: uv run --no-project --with ty ty check --ignore unresolved-import server
+
+      - name: Pytest
+        env:
+          PYTHONPATH: .
+        run: uv run --no-project --with pytest --with fastapi --with httpx --with python-dotenv pytest -q

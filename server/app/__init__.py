@@ -1,0 +1,1 @@
+"""MentoAI FastAPI application package."""

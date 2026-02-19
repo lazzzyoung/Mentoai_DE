@@ -6,7 +6,7 @@ fastapi
 uvicorn
 
 # --- Data Engineering & DB ---
-psycopg2-binary
+asyncpg
 sqlalchemy
 pydantic
 
