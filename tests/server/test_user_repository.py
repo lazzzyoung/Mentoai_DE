@@ -63,10 +63,11 @@ async def test_user_tables_are_bootstrapped_once(monkeypatch):
     await repo._ensure_user_tables()
     await repo._ensure_user_tables()
 
-    assert len(conn.executed) == 4
+    assert len(conn.executed) == 5
     assert any("CREATE TABLE IF NOT EXISTS users" in q for q in conn.executed)
     assert any("CREATE TABLE IF NOT EXISTS user_specs" in q for q in conn.executed)
     assert any("CREATE INDEX IF NOT EXISTS idx_user_specs_user_id" in q for q in conn.executed)
+    assert any("DELETE FROM user_specs older" in q for q in conn.executed)
     assert any(
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_specs_user_id" in q for q in conn.executed
     )

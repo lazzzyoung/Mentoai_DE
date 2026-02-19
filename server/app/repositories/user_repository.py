@@ -112,6 +112,14 @@ async def _ensure_user_tables() -> None:
             )
             await conn.execute(
                 """
+                DELETE FROM user_specs older
+                USING user_specs newer
+                WHERE older.user_id = newer.user_id
+                  AND older.spec_id < newer.spec_id
+                """
+            )
+            await conn.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_specs_user_id
                 ON user_specs (user_id)
                 """
