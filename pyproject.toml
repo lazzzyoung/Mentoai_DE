@@ -275,13 +275,24 @@ shell = "cd infra && docker compose logs -f"
 
 [tool.poe.tasks.smoke-test]
 help = "실행 확인용 API 헬스체크"
-cmd = "bash -lc 'for i in {1..60}; do curl -fsS http://localhost:8000/health && exit 0; sleep 2; done; echo \"서버에 아직 연결되지 않았습니다.\"; exit 1'"
+shell = """
+bash -lc '
+for i in {1..60}; do
+  curl -kfsS https://localhost/health && exit 0
+  curl -fsS http://localhost:8000/health && exit 0
+  sleep 2
+done
+echo "서버에 아직 연결되지 않았습니다.(https://localhost 또는 http://localhost:8000)"
+exit 1
+'
+"""
 
 [tool.poe.tasks.smoke-quick-login]
 help = "간편 로그인 API 동작 및 사용자 테이블 자동 초기화 확인"
 shell = """
 python - <<'PY'
 import json
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -292,29 +303,40 @@ payload = {
     "career_years": 1,
     "skills": ["Python", "Spark"],
 }
-last_error = None
+base_urls = ["https://localhost", "http://localhost:8000"]
 for attempt in range(1, 31):
-    try:
-        request = urllib.request.Request(
-            "http://localhost:8000/api/v3/auth/quick-login",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=20) as response:
-            body = json.loads(response.read().decode("utf-8"))
+    last_error = None
+    success = False
+    for base in base_urls:
+        try:
+            request = urllib.request.Request(
+                f"{base}/api/v3/auth/quick-login",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            kwargs = {"timeout": 20}
+            if base.startswith("https://"):
+                kwargs["context"] = ssl._create_unverified_context()
 
-        user_id = int(body.get("user_id", 0))
-        if user_id < 1:
-            raise RuntimeError("간편 로그인 응답에서 user_id를 확인하지 못했습니다.")
+            with urllib.request.urlopen(request, **kwargs) as response:
+                body = json.loads(response.read().decode("utf-8"))
 
-        print(f"quick-login ok (user_id={user_id})")
+            user_id = int(body.get("user_id", 0))
+            if user_id < 1:
+                raise RuntimeError("간편 로그인 응답에서 user_id를 확인하지 못했습니다.")
+
+            print(f"quick-login ok (user_id={user_id}, url={base})")
+            success = True
+            break
+        except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as exc:
+            last_error = exc
+
+    if success:
         break
-    except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as exc:
-        last_error = exc
-        if attempt == 30:
-            raise SystemExit(f"quick-login 실패: {exc}") from exc
-        time.sleep(2)
+    if attempt == 30:
+        raise SystemExit(f"quick-login 실패: {last_error}") from last_error
+    time.sleep(2)
 PY
 """
 
