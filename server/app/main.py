@@ -43,6 +43,10 @@ def create_app() -> FastAPI:
     async def health_check() -> dict[str, str]:
         return {"status": "ok", "message": "MentoAI service is running"}
 
+    @app.get("/favicon.ico")
+    async def favicon() -> FileResponse:
+        return FileResponse(STATIC_DIR / "favicon.png")
+
     @app.get("/jobs")
     async def jobs_home() -> FileResponse:
         return FileResponse(STATIC_DIR / "home.html")

@@ -13,6 +13,16 @@ def test_health_check() -> None:
     assert response.json() == {"status": "ok", "message": "MentoAI service is running"}
 
 
+def test_favicon_served() -> None:
+    response = client.get("/favicon.ico")
+    assert response.status_code == 200
+    assert response.headers.get("content-type") in {
+        "image/png",
+        "image/vnd.microsoft.icon",
+        "image/x-icon",
+    }
+
+
 def test_home_page_served() -> None:
     response = client.get("/")
     assert response.status_code == 200
