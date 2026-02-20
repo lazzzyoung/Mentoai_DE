@@ -432,11 +432,50 @@ import sys
 
 run_id = sys.argv[1]
 state = ""
-rows = json.load(sys.stdin)
+
+raw = sys.stdin.read().strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+
+# 로그/경고가 앞에 섞일 수 있어 JSON 시작 지점부터 파싱 시도
+start_candidates = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+if not start_candidates:
+    print("")
+    raise SystemExit(0)
+
+payload = raw[min(start_candidates):]
+obj = None
+try:
+    obj = json.loads(payload)
+except json.JSONDecodeError:
+    # 마지막 줄들 중 JSON 형태를 재시도
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if not line or line[0] not in "[{":
+            continue
+        try:
+            obj = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+
+if obj is None:
+    print("")
+    raise SystemExit(0)
+
+if isinstance(obj, list):
+    rows = obj
+elif isinstance(obj, dict):
+    rows = obj.get("dag_runs") or obj.get("runs") or []
+else:
+    rows = []
+
 for row in rows:
     if row.get("run_id") == run_id:
         state = (row.get("state") or "").lower()
         break
+
 print(state)
 PY
 )
@@ -519,11 +558,50 @@ import sys
 
 run_id = sys.argv[1]
 state = ""
-rows = json.load(sys.stdin)
+
+raw = sys.stdin.read().strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+
+# 로그/경고가 앞에 섞일 수 있어 JSON 시작 지점부터 파싱 시도
+start_candidates = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+if not start_candidates:
+    print("")
+    raise SystemExit(0)
+
+payload = raw[min(start_candidates):]
+obj = None
+try:
+    obj = json.loads(payload)
+except json.JSONDecodeError:
+    # 마지막 줄들 중 JSON 형태를 재시도
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if not line or line[0] not in "[{":
+            continue
+        try:
+            obj = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+
+if obj is None:
+    print("")
+    raise SystemExit(0)
+
+if isinstance(obj, list):
+    rows = obj
+elif isinstance(obj, dict):
+    rows = obj.get("dag_runs") or obj.get("runs") or []
+else:
+    rows = []
+
 for row in rows:
     if row.get("run_id") == run_id:
         state = (row.get("state") or "").lower()
         break
+
 print(state)
 PY
 )
@@ -599,11 +677,50 @@ import sys
 
 run_id = sys.argv[1]
 state = ""
-rows = json.load(sys.stdin)
+
+raw = sys.stdin.read().strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+
+# 로그/경고가 앞에 섞일 수 있어 JSON 시작 지점부터 파싱 시도
+start_candidates = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+if not start_candidates:
+    print("")
+    raise SystemExit(0)
+
+payload = raw[min(start_candidates):]
+obj = None
+try:
+    obj = json.loads(payload)
+except json.JSONDecodeError:
+    # 마지막 줄들 중 JSON 형태를 재시도
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if not line or line[0] not in "[{":
+            continue
+        try:
+            obj = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+
+if obj is None:
+    print("")
+    raise SystemExit(0)
+
+if isinstance(obj, list):
+    rows = obj
+elif isinstance(obj, dict):
+    rows = obj.get("dag_runs") or obj.get("runs") or []
+else:
+    rows = []
+
 for row in rows:
     if row.get("run_id") == run_id:
         state = (row.get("state") or "").lower()
         break
+
 print(state)
 PY
 )
