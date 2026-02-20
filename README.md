@@ -37,8 +37,13 @@ uv run poe env-init
 `.env`에서 최소 설정:
 
 - `OPENAI_API_KEY`
+- `OPENAI_DEFAULT_MODEL` (기본: `gpt-5-mini`)
+- `ANALYSIS_MODEL` (기본: `gpt-5-mini`)
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
+
+> 계정에서 `gpt-5-mini` 접근이 안 되면 `ANALYSIS_MODEL=gpt-4o-mini`로 설정하세요.
+> 이전 변수명 `OPENAI_MODEL`도 하위호환으로 인식합니다.
 
 서버 실행:
 
@@ -99,4 +104,3 @@ uv run poe check
 - UI 라우트 접근 회귀
 - SQLModel 사용자 생성/조회 로직
 - 오류 응답 메시지(사용자 친화 한국어)
-

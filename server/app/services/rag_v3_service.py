@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from fastapi import HTTPException
 
-from server.app.core.config import OPENAI_API_KEY, OPENAI_MODEL, RECOMMENDATION_LIMIT
+from server.app.core.config import ANALYSIS_MODEL, OPENAI_API_KEY, RECOMMENDATION_LIMIT
 from server.app.prompts import JOB_ANALYSIS_PROMPT_TEMPLATE
 from server.app.repositories import job_repository
 from server.app.repositories.user_repository import create_quick_user, fetch_user_info
@@ -142,7 +142,7 @@ async def _get_llm() -> Any | None:
 
             chat_openai = cast(Any, ChatOpenAI)
             _llm = chat_openai(
-                model=OPENAI_MODEL,
+                model=ANALYSIS_MODEL,
                 api_key=OPENAI_API_KEY,
                 temperature=0.3,
                 max_retries=2,

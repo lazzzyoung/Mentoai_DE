@@ -14,7 +14,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 SQLITE_DB_PATH = Path(os.getenv("SQLITE_DB_PATH", str(DATA_DIR / "mentoai.db")))
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_DEFAULT_MODEL = os.getenv("OPENAI_DEFAULT_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini"))
+ANALYSIS_MODEL = os.getenv("ANALYSIS_MODEL", OPENAI_DEFAULT_MODEL)
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BM-K/KoSimCSE-roberta-multitask")
 
