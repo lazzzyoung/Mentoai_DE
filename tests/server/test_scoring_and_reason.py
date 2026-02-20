@@ -1,6 +1,6 @@
 from server.app.repositories.job_repository import JobCandidate
 from server.app.services.hybrid_retriever import _build_reason
-from server.app.services.rag_v3_service import _to_match_score
+from server.app.services.rag_v3_service import _resolve_recommendation_limit, _to_match_score
 
 
 def test_match_score_is_probability_like_scale() -> None:
@@ -35,3 +35,26 @@ def test_reason_message_is_restored_to_previous_tone() -> None:
     assert _build_reason(candidate, 0.9) == "경험과 기술 맥락이 공고 요구사항과 잘 맞습니다."
     assert "일부 일치" in _build_reason(candidate, 0.3)
     assert _build_reason(candidate_without_skills, 0.3) == "희망 직무와 공고 핵심 내용이 유사합니다."
+
+
+def test_resolve_recommendation_limit_keeps_enough_pool_for_paging(monkeypatch) -> None:
+    monkeypatch.setattr("server.app.services.rag_v3_service.RECOMMENDATION_LIMIT", 5)
+    monkeypatch.setattr("server.app.services.rag_v3_service.CANDIDATE_LIMIT", 50)
+    assert _resolve_recommendation_limit() == 20
+
+
+def test_resolve_recommendation_limit_respects_candidate_ceiling(monkeypatch) -> None:
+    monkeypatch.setattr("server.app.services.rag_v3_service.RECOMMENDATION_LIMIT", 30)
+    monkeypatch.setattr("server.app.services.rag_v3_service.CANDIDATE_LIMIT", 12)
+    assert _resolve_recommendation_limit() == 12
+
+
+def test_resolve_recommendation_limit_uses_requested_limit(monkeypatch) -> None:
+    monkeypatch.setattr("server.app.services.rag_v3_service.RECOMMENDATION_LIMIT", 20)
+    monkeypatch.setattr("server.app.services.rag_v3_service.CANDIDATE_LIMIT", 50)
+    assert _resolve_recommendation_limit(35) == 35
+
+
+def test_resolve_recommendation_limit_clamps_requested_limit(monkeypatch) -> None:
+    monkeypatch.setattr("server.app.services.rag_v3_service.CANDIDATE_LIMIT", 12)
+    assert _resolve_recommendation_limit(99) == 12

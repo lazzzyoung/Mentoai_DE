@@ -45,6 +45,9 @@ const detailTip = document.getElementById("detail-tip");
 const BOOKMARK_STORAGE_KEY = "mentoai_bookmark_jobs_v1";
 const USER_SESSION_STORAGE_KEY = "mentoai_last_user_session_v1";
 const LAST_SELECTED_JOB_STORAGE_KEY = "mentoai_last_selected_job_v1";
+const DEFAULT_PAGE_SIZE = 5;
+const DEFAULT_SORT = "score-desc";
+const MIN_FETCH_LIMIT = 20;
 
 let currentUserId = null;
 let currentSelectedJobId = null;
@@ -54,8 +57,8 @@ let allRecommendations = [];
 let bookmarkJobs = [];
 let jobPageState = {
   page: 1,
-  pageSize: 5,
-  sort: "score-desc",
+  pageSize: DEFAULT_PAGE_SIZE,
+  sort: DEFAULT_SORT,
   keyword: "",
 };
 
@@ -96,6 +99,14 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const toPositiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+};
+
 const safeJobId = (jobId) => toNumber(jobId) ?? String(jobId);
 
 const clampPage = (value, totalPages) => {
@@ -103,6 +114,37 @@ const clampPage = (value, totalPages) => {
   if (value < 1) return 1;
   if (value > totalPages) return totalPages;
   return value;
+};
+
+const getSelectedPageSize = () =>
+  toPositiveInt(jobPageSizeSelect?.value, DEFAULT_PAGE_SIZE);
+
+const getMaxPageSizeOption = () => {
+  if (!jobPageSizeSelect?.options?.length) {
+    return MIN_FETCH_LIMIT;
+  }
+  const optionValues = Array.from(jobPageSizeSelect.options)
+    .map((option) => toPositiveInt(option.value, 0))
+    .filter((value) => value > 0);
+
+  if (!optionValues.length) {
+    return MIN_FETCH_LIMIT;
+  }
+  return Math.max(...optionValues);
+};
+
+const getRecommendationFetchLimit = () =>
+  Math.max(MIN_FETCH_LIMIT, getMaxPageSizeOption());
+
+const buildRecommendationApiPath = (userId, limit) => {
+  const params = new URLSearchParams();
+  if (Number.isFinite(limit) && limit > 0) {
+    params.set("limit", String(Math.floor(limit)));
+  }
+  const query = params.toString();
+  return query
+    ? `/api/v3/jobs/recommend/${userId}?${query}`
+    : `/api/v3/jobs/recommend/${userId}`;
 };
 
 const getQueryUserId = () => {
@@ -409,8 +451,7 @@ const renderMetrics = (jobs) => {
 };
 
 const applyJobListState = () => {
-  const selectedSize = Number(jobPageSizeSelect.value);
-  jobPageState.pageSize = Number.isFinite(selectedSize) && selectedSize > 0 ? selectedSize : 5;
+  jobPageState.pageSize = getSelectedPageSize();
 
   const filtered = getFilteredRecommendations();
   const sorted = getSortedRecommendations(filtered);
@@ -617,7 +658,10 @@ const fetchRecommendations = async (userId) => {
     markPipeline(2, "active");
     setStatus("2/4 내 정보를 불러오는 중...");
 
-    const response = await fetch(`/api/v3/jobs/recommend/${userId}`, { method: "POST" });
+    const response = await fetch(
+      buildRecommendationApiPath(userId, getRecommendationFetchLimit()),
+      { method: "POST" },
+    );
     const data = await response.json();
 
     if (!response.ok) {
@@ -651,8 +695,8 @@ const fetchRecommendations = async (userId) => {
       ...jobPageState,
       page: 1,
       keyword: "",
-      sort: "score-desc",
-      pageSize: Number(jobPageSizeSelect?.value) || 5,
+      sort: DEFAULT_SORT,
+      pageSize: getSelectedPageSize(),
     };
     jobSortSelect.value = jobPageState.sort;
 

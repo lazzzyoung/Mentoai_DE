@@ -15,7 +15,7 @@ MentoAI는 구직자 프로필을 기반으로 채용 공고를 추천하고, �
 ## 1) 주요 엔드포인트
 
 - `POST /api/v3/auth/quick-login`
-- `POST /api/v3/jobs/recommend/{user_id}`
+- `POST /api/v3/jobs/recommend/{user_id}` (optional query: `limit`)
 - `POST /api/v3/jobs/{job_id}/analyze/{user_id}`
 
 유지되는 페이지/경로:
@@ -41,6 +41,7 @@ uv run poe env-init
 - `ANALYSIS_MODEL` (기본: `gpt-5-mini`)
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
+- `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
 
 > 계정에서 `gpt-5-mini` 접근이 안 되면 `ANALYSIS_MODEL=gpt-4o-mini`로 설정하세요.
 > 이전 변수명 `OPENAI_MODEL`도 하위호환으로 인식합니다.

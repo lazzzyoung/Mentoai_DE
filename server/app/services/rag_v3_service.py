@@ -6,7 +6,12 @@ from typing import Any, cast
 
 from fastapi import HTTPException
 
-from server.app.core.config import ANALYSIS_MODEL, OPENAI_API_KEY, RECOMMENDATION_LIMIT
+from server.app.core.config import (
+    ANALYSIS_MODEL,
+    CANDIDATE_LIMIT,
+    OPENAI_API_KEY,
+    RECOMMENDATION_LIMIT,
+)
 from server.app.prompts import JOB_ANALYSIS_PROMPT_TEMPLATE
 from server.app.repositories import job_repository
 from server.app.repositories.user_repository import create_quick_user, fetch_user_info
@@ -25,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 _llm: Any | None = None
 _llm_lock = asyncio.Lock()
+MIN_RECOMMENDATION_POOL = 20
+MAX_RECOMMENDATION_LIMIT = 200
 
 
 def _to_user_profile(user_info: dict[str, Any]) -> UserProfileSummary:
@@ -78,6 +85,21 @@ def _to_recommendations(ranked_jobs: list[Any]) -> list[JobSummary]:
     ]
 
 
+def _clamp_limit(value: int, *, lower: int = 1, upper: int = MAX_RECOMMENDATION_LIMIT) -> int:
+    return max(lower, min(upper, int(value)))
+
+
+def _resolve_recommendation_limit(requested_limit: int | None = None) -> int:
+    """추천 개수를 요청값/기본값으로 정하고 안전한 범위로 제한한다."""
+    if requested_limit is None:
+        desired = max(RECOMMENDATION_LIMIT, MIN_RECOMMENDATION_POOL)
+    else:
+        desired = requested_limit
+
+    upper_bound = min(CANDIDATE_LIMIT, MAX_RECOMMENDATION_LIMIT)
+    return _clamp_limit(desired, lower=1, upper=max(1, upper_bound))
+
+
 async def quick_login(data: QuickLoginRequest) -> QuickLoginResponse:
     try:
         user_id = await create_quick_user(
@@ -104,13 +126,13 @@ async def quick_login(data: QuickLoginRequest) -> QuickLoginResponse:
         ) from error
 
 
-async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
+async def recommend_jobs_list(user_id: int, limit: int | None = None) -> RecommendationListResponse:
     try:
         user_info = await fetch_user_info(user_id)
         user_profile = _to_user_profile(user_info)
         query_text = _build_user_query_text(user_profile)
 
-        ranked_jobs = await retrieve_jobs(query_text, limit=RECOMMENDATION_LIMIT)
+        ranked_jobs = await retrieve_jobs(query_text, limit=_resolve_recommendation_limit(limit))
         recommendations = _to_recommendations(ranked_jobs)
 
         return RecommendationListResponse(

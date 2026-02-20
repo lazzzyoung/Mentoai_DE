@@ -127,7 +127,7 @@ defaults = {
     "TARGET_JOB_ID": "",
     "CRAWLER_INTERVAL_MINUTES": "360",
     "RETRIEVAL_ALPHA": "0.45",
-    "RECOMMENDATION_LIMIT": "5",
+    "RECOMMENDATION_LIMIT": "20",
     "CANDIDATE_LIMIT": "50",
 }
 added = []

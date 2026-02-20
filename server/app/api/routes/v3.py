@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from server.app.schemas.v3 import (
     DetailedAnalysisResponse,
@@ -14,8 +14,11 @@ router = APIRouter(tags=["v3"])
 
 
 @router.post("/api/v3/jobs/recommend/{user_id}", response_model=RecommendationListResponse)
-async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
-    return await rag_v3_service.recommend_jobs_list(user_id)
+async def recommend_jobs_list(
+    user_id: int,
+    limit: int | None = Query(default=None, ge=1, le=200),
+) -> RecommendationListResponse:
+    return await rag_v3_service.recommend_jobs_list(user_id, limit=limit)
 
 
 @router.post("/api/v3/jobs/{job_id}/analyze/{user_id}", response_model=DetailedAnalysisResponse)

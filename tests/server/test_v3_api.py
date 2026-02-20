@@ -45,8 +45,9 @@ def test_v1_v2_endpoints_removed() -> None:
 
 
 def test_recommend_jobs_success(monkeypatch) -> None:
-    async def fake_recommend(user_id: int):
+    async def fake_recommend(user_id: int, limit: int | None = None):
         assert user_id == 1
+        assert limit is None
         return {
             "user_id": 1,
             "user_name": "테스트유저",
@@ -80,7 +81,8 @@ def test_recommend_jobs_success(monkeypatch) -> None:
 
 
 def test_recommend_jobs_not_found(monkeypatch) -> None:
-    async def fake_recommend(_user_id: int):
+    async def fake_recommend(_user_id: int, limit: int | None = None):
+        assert limit is None
         raise HTTPException(status_code=404, detail="User not found")
 
     monkeypatch.setattr(v3_routes.rag_v3_service, "recommend_jobs_list", fake_recommend)
@@ -88,6 +90,26 @@ def test_recommend_jobs_not_found(monkeypatch) -> None:
     response = client.post("/api/v3/jobs/recommend/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "User not found"
+
+
+def test_recommend_jobs_with_dynamic_limit(monkeypatch) -> None:
+    async def fake_recommend(user_id: int, limit: int | None = None):
+        assert user_id == 1
+        assert limit == 15
+        return {
+            "user_id": 1,
+            "user_name": "테스트유저",
+            "user_profile": {
+                "desired_job": "데이터 엔지니어",
+                "career_years": 2,
+                "skills": ["Python"],
+            },
+            "recommendations": [],
+        }
+
+    monkeypatch.setattr(v3_routes.rag_v3_service, "recommend_jobs_list", fake_recommend)
+    response = client.post("/api/v3/jobs/recommend/1?limit=15")
+    assert response.status_code == 200
 
 
 def test_quick_login_success(monkeypatch) -> None:
