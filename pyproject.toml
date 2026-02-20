@@ -411,6 +411,8 @@ for i in {1..30}; do
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
+    docker compose ps airflow-scheduler || true
+    docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
   sleep 2
@@ -495,6 +497,8 @@ for i in {1..30}; do
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
+    docker compose ps airflow-scheduler || true
+    docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
   sleep 2
@@ -572,6 +576,8 @@ for i in {1..30}; do
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
+    docker compose ps airflow-scheduler || true
+    docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
   sleep 2

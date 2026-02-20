@@ -124,7 +124,7 @@ uv run poe pipeline-once-headless
 
 동작:
 - 파이프라인에 필요한 컨테이너만 임시 기동
-- `mentoai_pipeline` DAG를 CLI 방식으로 1회 실행
+- `mentoai_pipeline` DAG를 스케줄러 기반으로 1회 트리거/대기
 - 종료 시 파이프라인 컨테이너 자동 정리
 - `postgres`, `qdrant`는 서비스용으로 유지됨
 

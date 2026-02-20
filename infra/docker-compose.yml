@@ -135,7 +135,6 @@ services:
       context: ./airflow              
       dockerfile: Dockerfile
     container_name: airflow-webserver
-    user: root
     command: webserver
     ports:
       - "8081:8080"
@@ -159,7 +158,6 @@ services:
       context: ./airflow              
       dockerfile: Dockerfile
     container_name: airflow-scheduler
-    user: root
     command: scheduler
     env_file:
       - ../.env
