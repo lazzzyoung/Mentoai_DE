@@ -7,6 +7,7 @@ from typing import Any, cast
 from fastapi import HTTPException
 
 from server.app.core.config import OPENAI_API_KEY, OPENAI_MODEL, RECOMMENDATION_LIMIT
+from server.app.prompts import JOB_ANALYSIS_PROMPT_TEMPLATE
 from server.app.repositories import job_repository
 from server.app.repositories.user_repository import create_quick_user, fetch_user_info
 from server.app.schemas.v3 import (
@@ -182,16 +183,7 @@ async def _run_llm_analysis(
     from langchain_core.prompts import ChatPromptTemplate
 
     parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
-    prompt = ChatPromptTemplate.from_template(
-        """
-        당신은 채용 면접관입니다. 사용자 프로필과 공고를 비교해 실천 가능한 조언을 제공하세요.
-        [사용자] {user_specs}
-        [공고] {company} / {title} / {content}
-
-        아래 JSON 포맷으로만 답변하세요.
-        {format_instructions}
-        """
-    )
+    prompt = ChatPromptTemplate.from_template(JOB_ANALYSIS_PROMPT_TEMPLATE)
 
     chain = prompt | llm | parser
     result = await chain.ainvoke(

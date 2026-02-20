@@ -1,0 +1,3 @@
+from .job_analysis import JOB_ANALYSIS_PROMPT_TEMPLATE
+
+__all__ = ["JOB_ANALYSIS_PROMPT_TEMPLATE"]
