@@ -202,19 +202,60 @@ sequence = [
 
 [tool.poe.tasks.docker-build]
 help = "저사양 권장 코어 서비스만 빌드/실행(ai-server, postgres, qdrant)"
-shell = "cd infra && docker compose build --no-cache --parallel=false ai-server && docker compose up -d --remove-orphans postgres qdrant ai-server"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+compose_args=(-f docker-compose.yml)
+if [ -f docker-compose.tls.yml ]; then
+  compose_args+=(-f docker-compose.tls.yml)
+fi
+docker compose "${compose_args[@]}" build --no-cache --parallel=false ai-server
+docker compose "${compose_args[@]}" up -d --remove-orphans postgres qdrant ai-server
+'
+"""
 
 [tool.poe.tasks.docker-up]
 help = "저사양 권장 코어 서비스 실행(이미지 빌드 없이)"
-shell = "cd infra && docker compose up -d --remove-orphans postgres qdrant ai-server"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+compose_args=(-f docker-compose.yml)
+if [ -f docker-compose.tls.yml ]; then
+  compose_args+=(-f docker-compose.tls.yml)
+fi
+docker compose "${compose_args[@]}" up -d --remove-orphans postgres qdrant ai-server
+'
+"""
 
 [tool.poe.tasks.docker-build-full]
 help = "전체 인프라 컨테이너 빌드/실행 (고사양 권장)"
-shell = "cd infra && docker compose up -d --build --remove-orphans"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+compose_args=(-f docker-compose.yml)
+if [ -f docker-compose.tls.yml ]; then
+  compose_args+=(-f docker-compose.tls.yml)
+fi
+docker compose "${compose_args[@]}" up -d --build --remove-orphans
+'
+"""
 
 [tool.poe.tasks.docker-up-full]
 help = "전체 인프라 컨테이너 실행(이미지 빌드 없이, 고사양 권장)"
-shell = "cd infra && docker compose up -d --remove-orphans"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+compose_args=(-f docker-compose.yml)
+if [ -f docker-compose.tls.yml ]; then
+  compose_args+=(-f docker-compose.tls.yml)
+fi
+docker compose "${compose_args[@]}" up -d --remove-orphans
+'
+"""
 
 [tool.poe.tasks.docker-down]
 help = "인프라 컨테이너 종료"
