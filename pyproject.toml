@@ -235,6 +235,11 @@ shell = """
 bash -lc '
 set -euo pipefail
 cd infra
+
+# Airflow 로그 권한 이슈 예방
+mkdir -p ../logs/scheduler ../logs/webserver ../logs/dag_processor_manager
+chmod -R 777 ../logs || true
+
 compose_args=(-f docker-compose.yml)
 if [ -f docker-compose.tls.yml ]; then
   compose_args+=(-f docker-compose.tls.yml)
@@ -249,6 +254,11 @@ shell = """
 bash -lc '
 set -euo pipefail
 cd infra
+
+# Airflow 로그 권한 이슈 예방
+mkdir -p ../logs/scheduler ../logs/webserver ../logs/dag_processor_manager
+chmod -R 777 ../logs || true
+
 compose_args=(-f docker-compose.yml)
 if [ -f docker-compose.tls.yml ]; then
   compose_args+=(-f docker-compose.tls.yml)
@@ -369,6 +379,10 @@ bash -lc '
 set -euo pipefail
 cd infra
 
+# Airflow 로그 권한 이슈 예방
+mkdir -p ../logs/scheduler ../logs/webserver ../logs/dag_processor_manager
+chmod -R 777 ../logs || true
+
 # 1) 파이프라인 공통 의존 서비스 (+ RAG 적재용 qdrant)
 docker compose up -d --remove-orphans postgres qdrant minio minio-init
 
@@ -444,6 +458,10 @@ if [ ! -f ../.env ]; then
 fi
 docker info >/dev/null 2>&1 || { echo "Docker 데몬이 실행 중이어야 합니다."; exit 1; }
 
+# Airflow 로그 권한 이슈 예방
+mkdir -p ../logs/scheduler ../logs/webserver ../logs/dag_processor_manager
+chmod -R 777 ../logs || true
+
 cleanup() {
   docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true
 }
@@ -506,6 +524,10 @@ if [ ! -f ../.env ]; then
   exit 1
 fi
 docker info >/dev/null 2>&1 || { echo "Docker 데몬이 실행 중이어야 합니다."; exit 1; }
+
+# Airflow 로그 권한 이슈 예방
+mkdir -p ../logs/scheduler ../logs/webserver ../logs/dag_processor_manager
+chmod -R 777 ../logs || true
 
 cleanup() {
   docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true

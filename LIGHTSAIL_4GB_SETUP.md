@@ -178,6 +178,16 @@ sudo iptables -t nat -D OUTPUT -p tcp -o lo --dport 443 -j REDIRECT --to-ports 8
 sudo netfilter-persistent save 2>/dev/null || true
 ```
 
+### C. Airflow `Permission denied: /opt/airflow/logs`
+원인: 호스트 bind mount 권한으로 Airflow가 로그 디렉터리를 쓰지 못함
+
+최신 poe task는 실행 전에 자동으로 로그 디렉터리 권한을 보정합니다.  
+구버전 스크립트에서 바로 응급 조치하려면:
+```bash
+mkdir -p ~/Mentoai_DE/logs/scheduler ~/Mentoai_DE/logs/webserver ~/Mentoai_DE/logs/dag_processor_manager
+chmod -R 777 ~/Mentoai_DE/logs
+```
+
 ---
 
 ## 10) 권장 실행 순서 요약
@@ -191,4 +201,3 @@ uv run poe docker-start
 ./setup_https_domain_only.sh mentoai.kro.kr jschae02@khu.ac.kr /home/ubuntu/Mentoai_DE
 uv run poe pipeline-once-headless
 ```
-
