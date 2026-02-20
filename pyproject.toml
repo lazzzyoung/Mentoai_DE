@@ -300,14 +300,14 @@ sequence = [
 ]
 
 [tool.poe.tasks.pipeline-stack-up]
-help = "수동 파이프라인 실행용 스택(Airflow/Spark/Kafka)만 기동"
+help = "수동 파이프라인 실행용 스택(Airflow/Spark/Kafka) 기동 + qdrant 보장"
 shell = """
 bash -lc '
 set -euo pipefail
 cd infra
 
-# 1) 파이프라인 공통 의존 서비스
-docker compose up -d --remove-orphans postgres minio minio-init
+# 1) 파이프라인 공통 의존 서비스 (+ RAG 적재용 qdrant)
+docker compose up -d --remove-orphans postgres qdrant minio minio-init
 
 # 2) Airflow DB/계정 초기화(이미 초기화된 경우 실패해도 계속)
 docker compose run --rm airflow-init || true
@@ -369,7 +369,7 @@ help = "수동 파이프라인 실행용 스택(Airflow/Spark/Kafka) 중지/정�
 cmd = "bash -lc 'cd infra && docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true'"
 
 [tool.poe.tasks.pipeline-once]
-help = "Airflow/Spark/Kafka 스택을 띄우고 DAG 1회 실행 후 정리"
+help = "Airflow/Spark/Kafka 스택을 띄우고(DAG 1회) RAG 적재용 qdrant까지 보장 후 정리"
 shell = """
 bash -lc '
 set -euo pipefail
@@ -387,7 +387,7 @@ cleanup() {
 trap cleanup EXIT
 
 # 1) 파이프라인 스택 기동
-docker compose up -d --remove-orphans postgres minio minio-init
+docker compose up -d --remove-orphans postgres qdrant minio minio-init
 docker compose run --rm airflow-init || true
 docker compose up -d --remove-orphans \
   zookeeper kafka spark-master spark-worker \
@@ -432,7 +432,7 @@ exit 1
 """
 
 [tool.poe.tasks.pipeline-once-headless]
-help = "UI 없이 Airflow CLI(dags test)로 파이프라인 1회 실행 후 정리"
+help = "UI 없이 Airflow CLI(dags test)로 파이프라인 1회 실행(qdrant 보장) 후 정리"
 shell = """
 bash -lc '
 set -euo pipefail
@@ -449,7 +449,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker compose up -d --remove-orphans postgres minio minio-init zookeeper kafka spark-master spark-worker
+docker compose up -d --remove-orphans postgres qdrant minio minio-init zookeeper kafka spark-master spark-worker
 docker compose run --rm airflow-init || true
 
 LOGICAL_DATE="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
