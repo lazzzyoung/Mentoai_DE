@@ -37,10 +37,10 @@ uv run poe env-init
 `.env`에서 최소 설정:
 
 - `OPENAI_API_KEY`
-- `OPENAI_DEFAULT_MODEL` (기본: `gpt-5-mini`)
-- `ANALYSIS_MODEL` (기본: `gpt-5-mini`)
+- `OPENAI_DEFAULT_MODEL` (기본: `gpt-4o-mini`)
+- `ANALYSIS_MODEL` (기본: `gpt-4o-mini`)
 - `OPENAI_PROMPT_CACHE_KEY_PREFIX` (기본: `mentoai-job-analysis-v1`)
-- `OPENAI_PROMPT_CACHE_RETENTION` (기본: `in_memory`)
+- `OPENAI_PROMPT_CACHE_RETENTION` (기본: 비움/미설정)
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
 - `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
@@ -49,7 +49,7 @@ uv run poe env-init
 - `ANALYSIS_CACHE_MAX_ENTRIES` (기본: `300`)
 - `ANALYSIS_CACHE_SWEEP_SECONDS` (기본: `60`)
 
-> 계정에서 `gpt-5-mini` 접근이 안 되면 `ANALYSIS_MODEL=gpt-4o-mini`로 설정하세요.
+> 품질 우선이 필요하면 `ANALYSIS_MODEL=gpt-5-mini`로 상향할 수 있습니다.
 > 이전 변수명 `OPENAI_MODEL`도 하위호환으로 인식합니다.
 
 서버 실행:
