@@ -14,9 +14,9 @@ Output rules (strict):
 - Follow the schema exactly via {format_instructions}.
 - Fill all fields. If information is limited, state assumptions briefly in analysis_summary.
 - current_score must be an integer between 0 and 100.
-- current_score means estimated selection probability percentage.
-  (Example: 50 means roughly 50:50 chance.)
-- Be conservative: if major requirement gaps exist, keep score below 60.
+- current_score is a hiring-likelihood index, not a raw probability.
+- If the chance is roughly 50:50, set current_score around 70.
+- Be conservative: if major requirement gaps exist, keep score below 65.
 - max_score must be 100.
 - analysis_summary should be 2~4 Korean sentences.
 - required_tech_stack should list 3~8 concrete skills/keywords from the posting (or closest equivalents).

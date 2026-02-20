@@ -57,7 +57,11 @@ def _build_user_query_text(user_profile: UserProfileSummary) -> str:
 
 def _to_match_score(score: float) -> int:
     bounded = max(0.0, min(score, 1.0))
-    return int(round(bounded * 100))
+    if bounded <= 0.5:
+        mapped = (bounded / 0.5) * 70
+    else:
+        mapped = 70 + (((bounded - 0.5) / 0.5) * 30)
+    return int(round(mapped))
 
 
 def _to_recommendations(ranked_jobs: list[Any]) -> list[JobSummary]:
@@ -158,7 +162,7 @@ def _fallback_analysis(title: str, company: str) -> DetailedAnalysisResponse:
     return DetailedAnalysisResponse(
         job_title=title,
         company_name=company,
-        current_score=68,
+        current_score=70,
         max_score=100,
         analysis_summary="핵심 역량은 일부 맞지만 실무 프로젝트 경험 보강이 필요합니다.",
         required_tech_stack=["Python", "SQL", "데이터 파이프라인"],
