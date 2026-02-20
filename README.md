@@ -39,6 +39,8 @@ uv run poe env-init
 - `OPENAI_API_KEY`
 - `OPENAI_DEFAULT_MODEL` (기본: `gpt-5-mini`)
 - `ANALYSIS_MODEL` (기본: `gpt-5-mini`)
+- `OPENAI_PROMPT_CACHE_KEY_PREFIX` (기본: `mentoai-job-analysis-v1`)
+- `OPENAI_PROMPT_CACHE_RETENTION` (기본: `in_memory`)
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
 - `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
@@ -102,6 +104,7 @@ uv run poe check
 ### 상세 분석 흐름
 - 공고 단건 조회 후 LLM 분석
 - 동일 사용자/공고 조합에 대해 in-memory 캐시 적용(설정 TTL)
+- OpenAI prompt cache key/retention 옵션 전달(지원 모델에서 토큰 캐시 절감)
 - LLM 키가 없거나 오류 시 안전한 fallback 분석 응답 제공
 
 ---

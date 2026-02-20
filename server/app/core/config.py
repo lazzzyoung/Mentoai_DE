@@ -16,6 +16,8 @@ SQLITE_DB_PATH = Path(os.getenv("SQLITE_DB_PATH", str(DATA_DIR / "mentoai.db")))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_DEFAULT_MODEL = os.getenv("OPENAI_DEFAULT_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini"))
 ANALYSIS_MODEL = os.getenv("ANALYSIS_MODEL", OPENAI_DEFAULT_MODEL)
+OPENAI_PROMPT_CACHE_KEY_PREFIX = os.getenv("OPENAI_PROMPT_CACHE_KEY_PREFIX", "mentoai-job-analysis-v1")
+OPENAI_PROMPT_CACHE_RETENTION = os.getenv("OPENAI_PROMPT_CACHE_RETENTION", "in_memory")
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BM-K/KoSimCSE-roberta-multitask")
 

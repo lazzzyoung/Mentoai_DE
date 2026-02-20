@@ -18,6 +18,8 @@ from server.app.core.config import (
     ANALYSIS_MODEL,
     CANDIDATE_LIMIT,
     OPENAI_API_KEY,
+    OPENAI_PROMPT_CACHE_KEY_PREFIX,
+    OPENAI_PROMPT_CACHE_RETENTION,
     RECOMMENDATION_LIMIT,
 )
 from server.app.prompts import JOB_ANALYSIS_PROMPT_TEMPLATE
@@ -238,17 +240,84 @@ async def _run_llm_analysis(
     parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
     prompt = ChatPromptTemplate.from_template(JOB_ANALYSIS_PROMPT_TEMPLATE)
 
-    chain = prompt | llm | parser
-    result = await chain.ainvoke(
-        {
-            "user_specs": query_text,
-            "company": job["company"],
-            "title": job["title"],
-            "content": job["full_text"],
-            "format_instructions": parser.get_format_instructions(),
-        }
-    )
+    prompt_input = {
+        "user_specs": query_text,
+        "company": job["company"],
+        "title": job["title"],
+        "content": job["full_text"],
+        "format_instructions": parser.get_format_instructions(),
+    }
+    messages = prompt.invoke(prompt_input).to_messages()
+    invoke_kwargs = _build_prompt_cache_kwargs(int(job.get("job_id") or 0))
+
+    try:
+        response = await llm.ainvoke(messages, **invoke_kwargs)
+    except TypeError as error:
+        if not invoke_kwargs:
+            raise
+        logger.warning("Prompt cache 인자 미지원으로 일반 호출로 재시도합니다: %s", error)
+        response = await llm.ainvoke(messages)
+    except Exception as error:
+        if not invoke_kwargs or "prompt_cache" not in str(error).lower():
+            raise
+        logger.warning("Prompt cache 적용 실패로 일반 호출로 재시도합니다: %s", error)
+        response = await llm.ainvoke(messages)
+
+    _log_llm_token_usage(response)
+
+    try:
+        raw_content = response.content if isinstance(response.content, str) else str(response.content or "")
+        result = parser.parse(raw_content)
+    except Exception as error:
+        logger.warning("LLM 응답 파싱 실패로 fallback 분석을 사용합니다: %s", error)
+        return {}
+
     return result if isinstance(result, dict) else {}
+
+
+def _build_prompt_cache_kwargs(job_id: int) -> dict[str, Any]:
+    key_prefix = OPENAI_PROMPT_CACHE_KEY_PREFIX.strip()
+    retention = OPENAI_PROMPT_CACHE_RETENTION.strip()
+
+    kwargs: dict[str, Any] = {}
+    if key_prefix:
+        kwargs["prompt_cache_key"] = f"{key_prefix}:{job_id}" if job_id > 0 else key_prefix
+    if retention:
+        kwargs["prompt_cache_retention"] = retention
+    return kwargs
+
+
+def _log_llm_token_usage(response: Any) -> None:
+    metadata = getattr(response, "response_metadata", None) or {}
+    token_usage = metadata.get("token_usage") or metadata.get("usage") or {}
+    usage_meta = getattr(response, "usage_metadata", None) or {}
+
+    prompt_tokens = token_usage.get("prompt_tokens") or token_usage.get("input_tokens")
+    completion_tokens = token_usage.get("completion_tokens") or token_usage.get("output_tokens")
+
+    cached_tokens: int | None = None
+    for detail_key in ("prompt_tokens_details", "input_tokens_details"):
+        details = token_usage.get(detail_key)
+        if isinstance(details, dict) and details.get("cached_tokens") is not None:
+            cached_tokens = int(details.get("cached_tokens"))
+            break
+
+    if cached_tokens is None:
+        usage_details = usage_meta.get("input_token_details") or usage_meta.get("prompt_token_details")
+        if isinstance(usage_details, dict):
+            raw_cached = usage_details.get("cached_tokens", usage_details.get("cache_read"))
+            if raw_cached is not None:
+                cached_tokens = int(raw_cached)
+
+    if prompt_tokens is None and completion_tokens is None and cached_tokens is None:
+        return
+
+    logger.info(
+        "LLM usage prompt=%s completion=%s cached=%s",
+        prompt_tokens,
+        completion_tokens,
+        cached_tokens,
+    )
 
 
 def _finalize_analysis(result: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:

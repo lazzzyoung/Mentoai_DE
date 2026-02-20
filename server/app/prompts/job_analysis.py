@@ -25,6 +25,6 @@ Output rules (strict):
 - interview_tip should be one concise Korean paragraph with actionable advice.
 
 Inputs:
-[사용자] {user_specs}
 [공고] {company} / {title} / {content}
+[사용자] {user_specs}
 """.strip()
