@@ -4,6 +4,7 @@ MentoAI는 구직자 프로필을 기반으로 채용 공고를 추천하고, �
 
 이번 버전은 **4GB Ubuntu 환경**을 기준으로 경량화되어 아래 구조로 동작합니다.
 
+- **실행 지원 플랫폼**: macOS ARM64(Apple Silicon), Linux x86_64
 - **FastAPI + 정적 UI 3페이지**
 - **SQLModel + SQLite 단일 저장소**
 - **Hybrid RAG (SQLite FTS5 + Python semantic rerank)**
@@ -62,10 +63,6 @@ uv run poe crawl-once
 ## 3) 개발 품질 명령
 
 ```bash
-uv run poe format
-uv run poe lint
-uv run poe typecheck
-uv run poe test
 uv run poe check
 ```
 

@@ -12,9 +12,10 @@ dependencies = [
     "pydantic>=2.8.0",
     "python-dotenv>=1.0.0",
     "requests>=2.32.0",
-    "sentence-transformers; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sentence-transformers; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
     "sqlmodel>=0.0.22",
     "torch==2.2.2+cpu; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torch>=2.2,<3; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "uvicorn>=0.30.0",
 ]
 
@@ -59,22 +60,6 @@ pythonpath = ["."]
 [tool.poe.tasks.install]
 help = "프로젝트 의존성 동기화"
 cmd = "uv sync"
-
-[tool.poe.tasks.format]
-help = "코드 포맷 정리"
-cmd = "uv run ruff format server tests"
-
-[tool.poe.tasks.lint]
-help = "정적 린트 검사"
-cmd = "uv run ruff check server tests"
-
-[tool.poe.tasks.typecheck]
-help = "타입 검사"
-cmd = "uv run ty check server"
-
-[tool.poe.tasks.test]
-help = "테스트 실행"
-cmd = "uv run pytest"
 
 [tool.poe.tasks.check]
 help = "코드 퀄리티 전체(린트/타입/테스트)"
