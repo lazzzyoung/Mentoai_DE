@@ -15,15 +15,6 @@ DOMAIN="${1:?도메인을 넣어주세요. 예: api.example.com}"
 EMAIL="${2:?이메일을 넣어주세요. 예: admin@example.com}"
 PROJECT_DIR="${3:-$HOME/Mentoai_DE}"
 WWW_DOMAIN=""
-if [[ "$DOMAIN" != www.* ]]; then
-  WWW_DOMAIN="www.$DOMAIN"
-fi
-
-if [[ -n "$WWW_DOMAIN" ]]; then
-  ALLOWED_HOSTS_VALUE="$DOMAIN,$WWW_DOMAIN,localhost,127.0.0.1"
-else
-  ALLOWED_HOSTS_VALUE="$DOMAIN,localhost,127.0.0.1"
-fi
 
 INFRA_DIR="$PROJECT_DIR/infra"
 MAIN_PY="$PROJECT_DIR/server/app/main.py"
@@ -34,6 +25,11 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "필수 명령어 없음: $1"; exit 1; }
 }
 
+has_dns_record() {
+  local host="$1"
+  getent ahosts "$host" >/dev/null 2>&1
+}
+
 add_iptables_rule() {
   # 중복 추가 방지
   local table="$1"; shift
@@ -42,9 +38,17 @@ add_iptables_rule() {
   fi
 }
 
+del_iptables_rule_if_exists() {
+  local table="$1"; shift
+  if sudo iptables -t "$table" -C "$@" 2>/dev/null; then
+    sudo iptables -t "$table" -D "$@"
+  fi
+}
+
 require_cmd docker
 require_cmd python3
 require_cmd certbot
+require_cmd getent
 
 if [[ ! -f "$INFRA_DIR/docker-compose.yml" ]]; then
   echo "docker-compose.yml을 찾을 수 없습니다: $INFRA_DIR/docker-compose.yml"
@@ -54,6 +58,25 @@ if [[ ! -f "$MAIN_PY" ]]; then
   echo "main.py를 찾을 수 없습니다: $MAIN_PY"
   exit 1
 fi
+
+if [[ "$DOMAIN" != www.* ]]; then
+  candidate_www="www.$DOMAIN"
+  if has_dns_record "$candidate_www"; then
+    WWW_DOMAIN="$candidate_www"
+  else
+    echo "알림: $candidate_www DNS 레코드가 없어 www 인증서는 건너뜁니다."
+  fi
+fi
+
+if [[ -n "$WWW_DOMAIN" ]]; then
+  ALLOWED_HOSTS_VALUE="$DOMAIN,$WWW_DOMAIN,localhost,127.0.0.1"
+else
+  ALLOWED_HOSTS_VALUE="$DOMAIN,localhost,127.0.0.1"
+fi
+
+echo "[0/7] certbot standalone 방해 가능 규칙 정리(80->8000 리다이렉트 제거)"
+del_iptables_rule_if_exists nat PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8000
+del_iptables_rule_if_exists nat OUTPUT -p tcp -o lo --dport 80 -j REDIRECT --to-ports 8000
 
 echo "[1/7] Let's Encrypt 인증서 발급(또는 갱신)"
 CERTBOT_DOMAIN_ARGS=(-d "$DOMAIN")
