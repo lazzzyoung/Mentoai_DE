@@ -403,14 +403,16 @@ bash -lc '
 set -euo pipefail
 cd infra
 
+AIRFLOW_BIN="/home/airflow/.local/bin/airflow"
+
 RUN_ID="manual_$(date +%Y%m%d_%H%M%S)"
 echo "DAG 트리거: mentoai_pipeline (run_id=$RUN_ID)"
 
-docker compose exec -T airflow-scheduler airflow dags unpause mentoai_pipeline >/dev/null
-docker compose exec -T airflow-scheduler airflow dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
+docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags unpause mentoai_pipeline >/dev/null
+docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
 
 for i in {1..180}; do
-  STATE=$(docker compose exec -T airflow-scheduler airflow dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
+  STATE=$(docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
 import json
 import sys
 
@@ -452,6 +454,8 @@ bash -lc '
 set -euo pipefail
 cd infra
 
+AIRFLOW_BIN="/home/airflow/.local/bin/airflow"
+
 if [ ! -f ../.env ]; then
   echo ".env 파일이 필요합니다. README의 환경 변수 섹션을 먼저 설정하세요."
   exit 1
@@ -477,11 +481,11 @@ docker compose up -d --remove-orphans \
 # 2) DAG 수동 트리거 + 완료 대기
 RUN_ID="manual_$(date +%Y%m%d_%H%M%S)"
 echo "DAG 트리거: mentoai_pipeline (run_id=$RUN_ID)"
-docker compose exec -T airflow-scheduler airflow dags unpause mentoai_pipeline >/dev/null
-docker compose exec -T airflow-scheduler airflow dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
+docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags unpause mentoai_pipeline >/dev/null
+docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
 
 for i in {1..180}; do
-  STATE=$(docker compose exec -T airflow-scheduler airflow dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
+  STATE=$(docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
 import json
 import sys
 
@@ -539,7 +543,7 @@ docker compose run --rm airflow-init || true
 
 LOGICAL_DATE="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
 echo "Airflow DAG test 실행: mentoai_pipeline @ $LOGICAL_DATE"
-docker compose run --rm --no-deps airflow-scheduler bash -lc "airflow dags test mentoai_pipeline $LOGICAL_DATE"
+docker compose run --rm --no-deps airflow-scheduler bash -lc "/home/airflow/.local/bin/airflow dags test mentoai_pipeline $LOGICAL_DATE"
 '
 """
 
