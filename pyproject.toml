@@ -9,19 +9,16 @@ dependencies = [
     "beautifulsoup4",
     "fastapi",
     "kafka-python",
-    "langchain",
-    "langchain-community",
     "langchain-core",
     "langchain-huggingface",
     "langchain-openai",
-    "langchain-qdrant",
     "pendulum",
     "pydantic",
     "python-dotenv",
     "qdrant-client>=1.9.0",
     "requests",
-    "sentence-transformers",
-    "sqlalchemy",
+    "sentence-transformers; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torch==2.10.0+cpu; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "uvicorn",
 ]
 
@@ -32,6 +29,14 @@ dev = [
     "ty",
     "poethepoet",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }]
 
 [tool.ruff]
 line-length = 100
@@ -85,7 +90,7 @@ sequence = [
 ]
 
 [tool.poe.tasks.all]
-help = "전체 점검(포맷/퀄리티/도커 빌드/헬스/간편가입 검증) 수행"
+help = "전체 점검(포맷/퀄리티/저사양 코어 빌드/헬스/간편가입 검증) 수행"
 sequence = [
   { ref = "format" },
   { ref = "check" },
@@ -196,11 +201,19 @@ sequence = [
 ]
 
 [tool.poe.tasks.docker-build]
-help = "인프라 전체 컨테이너 빌드 후 백그라운드 실행"
-shell = "cd infra && docker compose up -d --build --remove-orphans"
+help = "저사양 권장 코어 서비스만 빌드/실행(ai-server, postgres, qdrant)"
+shell = "cd infra && docker compose build --no-cache --parallel=false ai-server && docker compose up -d --remove-orphans postgres qdrant ai-server"
 
 [tool.poe.tasks.docker-up]
-help = "인프라 컨테이너 실행(이미지 빌드 없이)"
+help = "저사양 권장 코어 서비스 실행(이미지 빌드 없이)"
+shell = "cd infra && docker compose up -d --remove-orphans postgres qdrant ai-server"
+
+[tool.poe.tasks.docker-build-full]
+help = "전체 인프라 컨테이너 빌드/실행 (고사양 권장)"
+shell = "cd infra && docker compose up -d --build --remove-orphans"
+
+[tool.poe.tasks.docker-up-full]
+help = "전체 인프라 컨테이너 실행(이미지 빌드 없이, 고사양 권장)"
 shell = "cd infra && docker compose up -d --remove-orphans"
 
 [tool.poe.tasks.docker-down]
@@ -265,11 +278,22 @@ PY
 """
 
 [tool.poe.tasks.docker-start]
-help = "Docker 인프라 실행 + 헬스체크 + 간편가입 스모크까지 순차 수행"
+help = "저사양 코어 서비스 실행 + 헬스체크 + 간편가입 스모크까지 순차 수행"
 sequence = [
   { ref = "preflight" },
   { ref = "docker-stop-if-running" },
   { ref = "docker-build" },
+  { ref = "docker-ps" },
+  { ref = "smoke-test" },
+  { ref = "smoke-quick-login" },
+]
+
+[tool.poe.tasks.docker-start-full]
+help = "전체 인프라 실행 + 헬스체크 + 간편가입 스모크까지 순차 수행 (고사양 권장)"
+sequence = [
+  { ref = "preflight" },
+  { ref = "docker-stop-if-running" },
+  { ref = "docker-build-full" },
   { ref = "docker-ps" },
   { ref = "smoke-test" },
   { ref = "smoke-quick-login" },

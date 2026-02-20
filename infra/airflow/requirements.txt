@@ -7,13 +7,5 @@ requests
 beautifulsoup4
 kafka-python
 
-# --- Airflow Providers ---
-apache-airflow-providers-docker
-apache-airflow-providers-slack
-
 # --- Data Engineering & DB ---
 psycopg2-binary
-boto3
-
-# --- AI & Vector DB ---
-qdrant-client

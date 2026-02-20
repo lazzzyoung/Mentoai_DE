@@ -1,15 +1,10 @@
-# --- Airflow 기본 및 유틸리티 ---
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.10.0+cpu
+
+# --- Spark 기본 ---
 python-dotenv
-
-# --- Scraping & Ingestion ---
-kafka-python
-
-# --- Data Engineering & DB ---
 pyspark==3.4.0
-psycopg2-binary
-boto3
 
 # --- AI & Vector DB ---
 qdrant-client
 sentence-transformers
-torch --extra-index-url https://download.pytorch.org/whl/cpu

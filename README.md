@@ -110,6 +110,7 @@ MENTOAI_DE/
 
 * Docker & Docker Compose
 * Python 3.11+
+* GPU 없는 amd64 서버(Lightsail) 기준으로 `torch`는 CPU 전용(`2.2.2+cpu`) 구성
 * API Keys:
     * OpenAI API Key
     * (선택) AWS Access Key (S3를 직접 사용할 때만)
@@ -130,6 +131,14 @@ MENTOAI_DE/
 cd infra
 docker compose up -d --build
 ```
+
+> 저사양 서버(예: Lightsail 4GB)에서는 빌드 시 병렬을 끄는 것을 권장합니다.
+>
+> ```bash
+> cd infra
+> docker compose build --no-cache --parallel=false
+> docker compose up -d
+> ```
 
 ### 3. 데이터 파이프라인 실행
 Airflow 웹 UI에 접속하여 파이프라인을 활성화합니다.
@@ -172,6 +181,14 @@ infra 디렉토리로 이동하여 모든 서비스를 실행합니다.
 cd infra
 docker compose up -d --build
 ```
+
+> 저사양 서버(예: Lightsail 4GB) 권장 명령:
+>
+> ```bash
+> cd infra
+> docker compose build --no-cache --parallel=false
+> docker compose up -d
+> ```
 
 MinIO 콘솔: `http://localhost:9001` (기본 `minioadmin / minioadmin`)
 
@@ -266,7 +283,8 @@ export PATH="$HOME/.local/bin:$PATH"
 - `poe preflight` : `.env` 존재 여부 + Docker 실행 상태 사전 점검
 - `poe docker-stop-if-running` : 실행 중인 인프라 컨테이너가 있으면 먼저 종료
 - `poe smoke-quick-login` : 간편 로그인 API 스모크(사용자 테이블 자동 초기화 포함) 검증
-- `poe docker-start` : `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login` 순차 실행
+- `poe docker-start` : **저사양 권장 코어 모드** (`ai-server`, `postgres`, `qdrant`) 기준으로 `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login` 순차 실행
+- `poe docker-start-full` : **전체 인프라 모드**(고사양 권장) 순차 실행
 - `poe all` : `format` + `check` + `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login`를 순서대로 수행
   - 실행 전 `Docker Desktop 실행` 및 프로젝트 루트 `.env` 파일 준비가 필요합니다.
   - `.env`가 없다면 `poe env-init` 실행 후 값부터 채워주세요.
@@ -276,8 +294,10 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### 인프라/도커 작업
 
-- `poe docker-build` : `cd infra && docker compose up -d --build --remove-orphans`
-- `poe docker-up` : `cd infra && docker compose up -d --remove-orphans`
+- `poe docker-build` : `cd infra && docker compose build --no-cache --parallel=false ai-server && docker compose up -d --remove-orphans postgres qdrant ai-server` (저사양 권장)
+- `poe docker-up` : `cd infra && docker compose up -d --remove-orphans postgres qdrant ai-server` (저사양 권장)
+- `poe docker-build-full` : `cd infra && docker compose up -d --build --remove-orphans` (전체 인프라)
+- `poe docker-up-full` : `cd infra && docker compose up -d --remove-orphans` (전체 인프라)
 - `poe docker-down` : `cd infra && docker compose down --remove-orphans` (멱등 실행 가능)
 - `poe docker-down-volumes` : `cd infra && docker compose down -v --remove-orphans`
 - `poe docker-ps` : `cd infra && docker compose ps`
