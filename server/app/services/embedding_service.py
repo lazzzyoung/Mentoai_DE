@@ -48,9 +48,7 @@ def _load_model() -> None:
             _model = model_class(EMBEDDING_MODEL, device="cpu")
             logger.info("Embedding model loaded: %s", EMBEDDING_MODEL)
         except ModuleNotFoundError:
-            logger.warning(
-                "sentence_transformers 패키지가 없어 hash fallback 임베딩을 사용합니다."
-            )
+            logger.warning("sentence_transformers 패키지가 없어 hash fallback 임베딩을 사용합니다.")
             _model = _MODEL_UNAVAILABLE
         except Exception as error:  # pragma: no cover - fallback path
             logger.warning("Embedding model load failed, using hash fallback: %s", error)

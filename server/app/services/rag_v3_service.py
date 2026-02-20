@@ -59,6 +59,20 @@ def _to_match_score(score: float) -> int:
     return max(60, min(95, int(round(55 + (bounded * 45)))))
 
 
+def _to_recommendations(ranked_jobs: list[Any]) -> list[JobSummary]:
+    return [
+        JobSummary(
+            job_id=job.job_id,
+            company=job.company,
+            title=job.title,
+            match_score=_to_match_score(job.score),
+            max_score=100,
+            reason=job.reason,
+        )
+        for job in ranked_jobs
+    ]
+
+
 async def quick_login(data: QuickLoginRequest) -> QuickLoginResponse:
     try:
         user_id = await create_quick_user(
@@ -92,18 +106,7 @@ async def recommend_jobs_list(user_id: int) -> RecommendationListResponse:
         query_text = _build_user_query_text(user_profile)
 
         ranked_jobs = await retrieve_jobs(query_text, limit=RECOMMENDATION_LIMIT)
-
-        recommendations = [
-            JobSummary(
-                job_id=job.job_id,
-                company=job.company,
-                title=job.title,
-                match_score=_to_match_score(job.score),
-                max_score=100,
-                reason=job.reason,
-            )
-            for job in ranked_jobs
-        ]
+        recommendations = _to_recommendations(ranked_jobs)
 
         return RecommendationListResponse(
             user_id=user_id,
@@ -126,7 +129,6 @@ async def _get_llm() -> Any | None:
 
     if _llm is not None:
         return _llm
-
     if not OPENAI_API_KEY:
         return None
 
@@ -171,6 +173,48 @@ def _fallback_analysis(title: str, company: str) -> DetailedAnalysisResponse:
     )
 
 
+async def _run_llm_analysis(
+    llm: Any,
+    query_text: str,
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
+    parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
+    prompt = ChatPromptTemplate.from_template(
+        """
+        당신은 채용 면접관입니다. 사용자 프로필과 공고를 비교해 실천 가능한 조언을 제공하세요.
+        [사용자] {user_specs}
+        [공고] {company} / {title} / {content}
+
+        아래 JSON 포맷으로만 답변하세요.
+        {format_instructions}
+        """
+    )
+
+    chain = prompt | llm | parser
+    result = await chain.ainvoke(
+        {
+            "user_specs": query_text,
+            "company": job["company"],
+            "title": job["title"],
+            "content": job["full_text"],
+            "format_instructions": parser.get_format_instructions(),
+        }
+    )
+    return result if isinstance(result, dict) else {}
+
+
+def _finalize_analysis(result: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
+    if not result:
+        result = _fallback_analysis(job["title"], job["company"]).model_dump()
+
+    result["job_title"] = job["title"]
+    result["company_name"] = job["company"]
+    return result
+
+
 async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
     try:
         user_info = await fetch_user_info(user_id)
@@ -182,38 +226,8 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         if llm is None:
             return _fallback_analysis(job["title"], job["company"]).model_dump()
 
-        from langchain_core.output_parsers import JsonOutputParser
-        from langchain_core.prompts import ChatPromptTemplate
-
-        parser = JsonOutputParser(pydantic_object=DetailedAnalysisResponse)
-        prompt = ChatPromptTemplate.from_template(
-            """
-            당신은 채용 면접관입니다. 사용자 프로필과 공고를 비교해 실천 가능한 조언을 제공하세요.
-            [사용자] {user_specs}
-            [공고] {company} / {title} / {content}
-
-            아래 JSON 포맷으로만 답변하세요.
-            {format_instructions}
-            """
-        )
-
-        chain = prompt | llm | parser
-        result = await chain.ainvoke(
-            {
-                "user_specs": query_text,
-                "company": job["company"],
-                "title": job["title"],
-                "content": job["full_text"],
-                "format_instructions": parser.get_format_instructions(),
-            }
-        )
-
-        if not isinstance(result, dict):
-            result = _fallback_analysis(job["title"], job["company"]).model_dump()
-
-        result["job_title"] = job["title"]
-        result["company_name"] = job["company"]
-        return result
+        analysis = await _run_llm_analysis(llm, query_text, job)
+        return _finalize_analysis(analysis, job)
     except HTTPException:
         raise
     except Exception as error:
