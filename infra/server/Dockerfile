@@ -2,9 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 시스템 의존성 설치 (Postgres 연결용)
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
-
 # 경로 변경에 따른 requirements 복사
 # (docker-compose에서 context를 프로젝트 루트로 잡을 예정이므로 경로를 맞춰줍니다)
 COPY infra/server/requirements.txt .
