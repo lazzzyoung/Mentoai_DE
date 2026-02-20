@@ -48,11 +48,14 @@ const LAST_SELECTED_JOB_STORAGE_KEY = "mentoai_last_selected_job_v1";
 const DEFAULT_PAGE_SIZE = 5;
 const DEFAULT_SORT = "score-desc";
 const MIN_FETCH_LIMIT = 20;
+const DETAIL_CLICK_DEBOUNCE_MS = 160;
 
 let currentUserId = null;
 let currentSelectedJobId = null;
 let detailRequestToken = 0;
 let detailAbortController = null;
+let detailDebounceTimer = null;
+let queuedDetailJob = null;
 let allRecommendations = [];
 let bookmarkJobs = [];
 let jobPageState = {
@@ -297,6 +300,11 @@ const markPipeline = (stepNumber, status) => {
 };
 
 const resetDetail = () => {
+  if (detailDebounceTimer) {
+    clearTimeout(detailDebounceTimer);
+    detailDebounceTimer = null;
+  }
+  queuedDetailJob = null;
   detailRequestToken += 1;
   if (detailAbortController) {
     detailAbortController.abort();
@@ -400,9 +408,9 @@ const renderJobs = (recommendations, totalCount, countLabel) => {
     detailBtn.type = "button";
     detailBtn.className = "job-detail-btn";
     detailBtn.textContent = "요약 보기";
-    detailBtn.addEventListener("click", async (event) => {
+    detailBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      await fetchJobDetail(job);
+      queueJobDetailFetch(job);
     });
 
     const bookmarkBtn = document.createElement("button");
@@ -418,10 +426,10 @@ const renderJobs = (recommendations, totalCount, countLabel) => {
     actions.append(detailBtn, bookmarkBtn);
     card.appendChild(actions);
 
-    card.addEventListener("click", async () => {
+    card.addEventListener("click", () => {
       document.querySelectorAll(".job-card").forEach((item) => item.classList.remove("active"));
       card.classList.add("active");
-      await fetchJobDetail(job);
+      queueJobDetailFetch(job);
     });
 
     jobList.appendChild(card);
@@ -640,6 +648,31 @@ const fetchJobDetail = async (job) => {
   }
 };
 
+const queueJobDetailFetch = (job, { immediate = false } = {}) => {
+  if (!job) return;
+
+  if (detailDebounceTimer) {
+    clearTimeout(detailDebounceTimer);
+    detailDebounceTimer = null;
+  }
+  queuedDetailJob = job;
+
+  if (immediate) {
+    const targetJob = queuedDetailJob;
+    queuedDetailJob = null;
+    void fetchJobDetail(targetJob);
+    return;
+  }
+
+  detailDebounceTimer = setTimeout(() => {
+    detailDebounceTimer = null;
+    const targetJob = queuedDetailJob;
+    queuedDetailJob = null;
+    if (!targetJob) return;
+    void fetchJobDetail(targetJob);
+  }, DETAIL_CLICK_DEBOUNCE_MS);
+};
+
 const fetchRecommendations = async (userId) => {
   resetPipeline();
   markPipeline(1, "active");
@@ -704,7 +737,7 @@ const fetchRecommendations = async (userId) => {
     applyJobListState();
 
     if (allRecommendations.length > 0) {
-      await fetchJobDetail(allRecommendations[0]);
+      queueJobDetailFetch(allRecommendations[0], { immediate: true });
     }
   } catch (error) {
     console.error("[recommend-error]", error);

@@ -164,6 +164,9 @@ defaults = {
     "RANK_RETRIEVAL_WEIGHT": "0.7",
     "RECOMMENDATION_LIMIT": "20",
     "CANDIDATE_LIMIT": "50",
+    "ANALYSIS_CACHE_TTL_SECONDS": "900",
+    "ANALYSIS_CACHE_MAX_ENTRIES": "300",
+    "ANALYSIS_CACHE_SWEEP_SECONDS": "60",
 }
 added = []
 for k, v in defaults.items():

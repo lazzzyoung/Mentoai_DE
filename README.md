@@ -43,6 +43,9 @@ uv run poe env-init
 - `CRAWLER_INTERVAL_MINUTES`
 - `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
 - `RANK_RETRIEVAL_WEIGHT` (기본: `0.7`, 검색점수 vs 프로필점수 결합 비율)
+- `ANALYSIS_CACHE_TTL_SECONDS` (기본: `900`)
+- `ANALYSIS_CACHE_MAX_ENTRIES` (기본: `300`)
+- `ANALYSIS_CACHE_SWEEP_SECONDS` (기본: `60`)
 
 > 계정에서 `gpt-5-mini` 접근이 안 되면 `ANALYSIS_MODEL=gpt-4o-mini`로 설정하세요.
 > 이전 변수명 `OPENAI_MODEL`도 하위호환으로 인식합니다.
@@ -98,6 +101,7 @@ uv run poe check
 
 ### 상세 분석 흐름
 - 공고 단건 조회 후 LLM 분석
+- 동일 사용자/공고 조합에 대해 in-memory 캐시 적용(설정 TTL)
 - LLM 키가 없거나 오류 시 안전한 fallback 분석 응답 제공
 
 ---

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
+import time
+from collections import OrderedDict
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any, cast
 
 from fastapi import HTTPException
 
 from server.app.core.config import (
+    ANALYSIS_CACHE_MAX_ENTRIES,
+    ANALYSIS_CACHE_SWEEP_SECONDS,
+    ANALYSIS_CACHE_TTL_SECONDS,
     ANALYSIS_MODEL,
     CANDIDATE_LIMIT,
     OPENAI_API_KEY,
@@ -32,6 +40,19 @@ _llm: Any | None = None
 _llm_lock = asyncio.Lock()
 MIN_RECOMMENDATION_POOL = 20
 MAX_RECOMMENDATION_LIMIT = 200
+
+
+@dataclass(slots=True)
+class AnalysisCacheEntry:
+    expires_at: float
+    payload: dict[str, Any]
+
+
+_analysis_cache: OrderedDict[str, AnalysisCacheEntry] = OrderedDict()
+_analysis_cache_lock = asyncio.Lock()
+_analysis_inflight: dict[str, asyncio.Task[dict[str, Any]]] = {}
+_analysis_inflight_lock = asyncio.Lock()
+_last_cache_sweep_at = 0.0
 
 
 def _to_user_profile(user_info: dict[str, Any]) -> UserProfileSummary:
@@ -239,6 +260,117 @@ def _finalize_analysis(result: dict[str, Any], job: dict[str, Any]) -> dict[str,
     return result
 
 
+def _build_analysis_cache_key(
+    *,
+    user_id: int,
+    job_id: int,
+    user_profile: UserProfileSummary,
+    job: dict[str, Any],
+) -> str:
+    normalized_skills = ",".join(
+        sorted(skill.strip().lower() for skill in user_profile.skills if skill and skill.strip())
+    )
+    payload = "|".join(
+        [
+            str(user_id),
+            str(job_id),
+            user_profile.desired_job.strip().lower(),
+            str(user_profile.career_years),
+            normalized_skills,
+            str(job.get("company") or ""),
+            str(job.get("title") or ""),
+            str(job.get("full_text") or ""),
+            ANALYSIS_MODEL,
+        ]
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+async def _get_cached_analysis(key: str) -> dict[str, Any] | None:
+    global _last_cache_sweep_at
+
+    now = time.monotonic()
+    sweep_interval = max(1, ANALYSIS_CACHE_SWEEP_SECONDS)
+    async with _analysis_cache_lock:
+        if now - _last_cache_sweep_at >= sweep_interval:
+            expired_keys = [
+                cache_key
+                for cache_key, entry in _analysis_cache.items()
+                if entry.expires_at <= now
+            ]
+            for expired_key in expired_keys:
+                _analysis_cache.pop(expired_key, None)
+            _last_cache_sweep_at = now
+
+        entry = _analysis_cache.get(key)
+        if entry is None:
+            return None
+        if entry.expires_at <= now:
+            _analysis_cache.pop(key, None)
+            return None
+
+        _analysis_cache.move_to_end(key)
+        return deepcopy(entry.payload)
+
+
+async def _set_cached_analysis(key: str, payload: dict[str, Any]) -> None:
+    global _last_cache_sweep_at
+
+    ttl_seconds = max(1, ANALYSIS_CACHE_TTL_SECONDS)
+    max_entries = max(1, ANALYSIS_CACHE_MAX_ENTRIES)
+    now = time.monotonic()
+    expires_at = now + ttl_seconds
+    sweep_interval = max(1, ANALYSIS_CACHE_SWEEP_SECONDS)
+
+    async with _analysis_cache_lock:
+        if now - _last_cache_sweep_at >= sweep_interval:
+            expired_keys = [
+                cache_key
+                for cache_key, entry in _analysis_cache.items()
+                if entry.expires_at <= now
+            ]
+            for expired_key in expired_keys:
+                _analysis_cache.pop(expired_key, None)
+            _last_cache_sweep_at = now
+
+        _analysis_cache[key] = AnalysisCacheEntry(
+            expires_at=expires_at,
+            payload=deepcopy(payload),
+        )
+        _analysis_cache.move_to_end(key)
+        while len(_analysis_cache) > max_entries:
+            _analysis_cache.popitem(last=False)
+
+
+async def _run_cached_analysis(
+    *,
+    cache_key: str,
+    llm: Any,
+    query_text: str,
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    cached = await _get_cached_analysis(cache_key)
+    if cached is not None:
+        return cached
+
+    async with _analysis_inflight_lock:
+        inflight_task = _analysis_inflight.get(cache_key)
+        if inflight_task is None:
+            inflight_task = asyncio.create_task(_run_llm_analysis(llm, query_text, job))
+            _analysis_inflight[cache_key] = inflight_task
+
+    try:
+        analysis = await inflight_task
+    finally:
+        async with _analysis_inflight_lock:
+            if _analysis_inflight.get(cache_key) is inflight_task:
+                _analysis_inflight.pop(cache_key, None)
+
+    finalized = _finalize_analysis(analysis, job)
+    await _set_cached_analysis(cache_key, finalized)
+    return deepcopy(finalized)
+
+
 async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
     try:
         user_info = await fetch_user_info(user_id)
@@ -250,8 +382,18 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
         if llm is None:
             return _fallback_analysis(job["title"], job["company"]).model_dump()
 
-        analysis = await _run_llm_analysis(llm, query_text, job)
-        return _finalize_analysis(analysis, job)
+        cache_key = _build_analysis_cache_key(
+            user_id=user_id,
+            job_id=job_id,
+            user_profile=user_profile,
+            job=job,
+        )
+        return await _run_cached_analysis(
+            cache_key=cache_key,
+            llm=llm,
+            query_text=query_text,
+            job=job,
+        )
     except HTTPException:
         raise
     except Exception as error:
@@ -263,5 +405,16 @@ async def analyze_job_detail(job_id: int, user_id: int) -> dict[str, Any]:
 
 
 async def close_resources() -> None:
-    global _llm
+    global _last_cache_sweep_at, _llm
     _llm = None
+    async with _analysis_cache_lock:
+        _analysis_cache.clear()
+        _last_cache_sweep_at = 0.0
+
+    async with _analysis_inflight_lock:
+        tasks = list(_analysis_inflight.values())
+        _analysis_inflight.clear()
+
+    for task in tasks:
+        if not task.done():
+            task.cancel()
