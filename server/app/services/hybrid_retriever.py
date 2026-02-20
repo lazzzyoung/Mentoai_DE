@@ -50,11 +50,13 @@ def _normalize_bm25(candidates: list[job_repository.JobCandidate]) -> dict[int, 
 
 
 def _build_reason(candidate: job_repository.JobCandidate, semantic_score: float) -> str:
-    if semantic_score >= 0.7:
-        return "경험과 기술 맥락이 공고 요구사항과 잘 맞습니다."
+    if semantic_score >= 0.85:
+        return "요구 기술·경험과의 일치도가 높은 편입니다."
+    if semantic_score >= 0.65:
+        return "요구사항과의 일치도가 보통 수준입니다. 핵심 경험 보완이 필요합니다."
     if candidate.skills_text:
         return f"기술 스택 키워드가 일부 일치합니다: {candidate.skills_text[:40]}"
-    return "희망 직무와 공고 핵심 내용이 유사합니다."
+    return "직무 키워드는 유사하지만 실무 경험 근거가 부족할 수 있습니다."
 
 
 async def retrieve_jobs(query_text: str, limit: int) -> list[RankedJob]:

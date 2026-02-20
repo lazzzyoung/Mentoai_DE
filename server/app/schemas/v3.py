@@ -5,7 +5,7 @@ class JobSummary(BaseModel):
     job_id: int
     company: str
     title: str
-    match_score: int = Field(description="적합도 점수 (60~100)")
+    match_score: int = Field(description="적합도 점수 (0~100)")
     max_score: int = Field(default=100, description="만점 기준")
     reason: str = Field(description="추천 이유 한 줄 요약")
 

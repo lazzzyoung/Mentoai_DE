@@ -57,7 +57,7 @@ def _build_user_query_text(user_profile: UserProfileSummary) -> str:
 
 def _to_match_score(score: float) -> int:
     bounded = max(0.0, min(score, 1.0))
-    return max(60, min(95, int(round(55 + (bounded * 45)))))
+    return int(round(bounded * 100))
 
 
 def _to_recommendations(ranked_jobs: list[Any]) -> list[JobSummary]:
