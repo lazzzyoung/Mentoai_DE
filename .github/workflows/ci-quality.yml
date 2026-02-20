@@ -21,13 +21,16 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Install dependencies
+        run: uv sync --dev
+
       - name: Ruff
-        run: uv run --no-project --with ruff ruff check server tests
+        run: uv run ruff check server tests
 
       - name: Ty
-        run: uv run --no-project --with ty ty check --ignore unresolved-import server
+        run: uv run ty check server
 
       - name: Pytest
         env:
           PYTHONPATH: .
-        run: uv run --no-project --with pytest --with fastapi --with httpx --with python-dotenv pytest -q
+        run: uv run pytest -q
