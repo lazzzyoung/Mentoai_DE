@@ -285,6 +285,12 @@ export PATH="$HOME/.local/bin:$PATH"
 - `poe smoke-quick-login` : 간편 로그인 API 스모크(사용자 테이블 자동 초기화 포함) 검증
 - `poe docker-start` : **저사양 권장 코어 모드** (`ai-server`, `postgres`, `qdrant`) 기준으로 `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login` 순차 실행
 - `poe docker-start-full` : **전체 인프라 모드**(고사양 권장) 순차 실행
+- `poe pipeline-stack-up` : 수동 파이프라인 실행용 스택(Airflow/Spark/Kafka)만 기동
+- `poe pipeline-run-manual` : `mentoai_pipeline` DAG 수동 1회 트리거 + 완료까지 대기
+- `poe pipeline-stack-down` : 파이프라인 스택 중지/정리
+- `poe pipeline-once` : `pipeline-stack-up` → `pipeline-run-manual` → `pipeline-stack-down` 일괄 실행
+- `poe pipeline-once-headless` : Airflow UI 없이 `airflow dags test`로 파이프라인 1회 실행 후 정리
+- `poe collect-once` : Airflow UI 없이 Kafka 수집기(`producer_wanted.py`)만 1회 실행 후 정리
 - `poe all` : `format` + `check` + `preflight` + `docker-stop-if-running` + `docker-build` + `docker-ps` + `smoke-test` + `smoke-quick-login`를 순서대로 수행
   - 실행 전 `Docker Desktop 실행` 및 프로젝트 루트 `.env` 파일 준비가 필요합니다.
   - `.env`가 없다면 `poe env-init` 실행 후 값부터 채워주세요.

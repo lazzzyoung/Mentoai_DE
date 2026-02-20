@@ -298,3 +298,185 @@ sequence = [
   { ref = "smoke-test" },
   { ref = "smoke-quick-login" },
 ]
+
+[tool.poe.tasks.pipeline-stack-up]
+help = "수동 파이프라인 실행용 스택(Airflow/Spark/Kafka)만 기동"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+
+# 1) 파이프라인 공통 의존 서비스
+docker compose up -d --remove-orphans postgres minio minio-init
+
+# 2) Airflow DB/계정 초기화(이미 초기화된 경우 실패해도 계속)
+docker compose run --rm airflow-init || true
+
+# 3) 파이프라인 본체
+docker compose up -d --remove-orphans \
+  zookeeper kafka spark-master spark-worker \
+  airflow-webserver airflow-scheduler
+'
+"""
+
+[tool.poe.tasks.pipeline-run-manual]
+help = "mentoai_pipeline DAG를 수동 1회 트리거하고 완료까지 대기"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+
+RUN_ID="manual_$(date +%Y%m%d_%H%M%S)"
+echo "DAG 트리거: mentoai_pipeline (run_id=$RUN_ID)"
+
+docker compose exec -T airflow-scheduler airflow dags unpause mentoai_pipeline >/dev/null
+docker compose exec -T airflow-scheduler airflow dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
+
+for i in {1..180}; do
+  STATE=$(docker compose exec -T airflow-scheduler airflow dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
+import json
+import sys
+
+run_id = sys.argv[1]
+state = ""
+rows = json.load(sys.stdin)
+for row in rows:
+    if row.get("run_id") == run_id:
+        state = (row.get("state") or "").lower()
+        break
+print(state)
+PY
+)
+  if [ "$STATE" = "success" ]; then
+    echo "DAG 성공: $RUN_ID"
+    exit 0
+  fi
+  if [ "$STATE" = "failed" ]; then
+    echo "DAG 실패: $RUN_ID"
+    exit 1
+  fi
+  echo "[$i/180] DAG 상태: ${STATE:-running}"
+  sleep 20
+done
+
+echo "DAG 타임아웃(60분): $RUN_ID"
+exit 1
+'
+"""
+
+[tool.poe.tasks.pipeline-stack-down]
+help = "수동 파이프라인 실행용 스택(Airflow/Spark/Kafka) 중지/정리"
+cmd = "bash -lc 'cd infra && docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true'"
+
+[tool.poe.tasks.pipeline-once]
+help = "Airflow/Spark/Kafka 스택을 띄우고 DAG 1회 실행 후 정리"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+
+if [ ! -f ../.env ]; then
+  echo ".env 파일이 필요합니다. README의 환경 변수 섹션을 먼저 설정하세요."
+  exit 1
+fi
+docker info >/dev/null 2>&1 || { echo "Docker 데몬이 실행 중이어야 합니다."; exit 1; }
+
+cleanup() {
+  docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true
+}
+trap cleanup EXIT
+
+# 1) 파이프라인 스택 기동
+docker compose up -d --remove-orphans postgres minio minio-init
+docker compose run --rm airflow-init || true
+docker compose up -d --remove-orphans \
+  zookeeper kafka spark-master spark-worker \
+  airflow-webserver airflow-scheduler
+
+# 2) DAG 수동 트리거 + 완료 대기
+RUN_ID="manual_$(date +%Y%m%d_%H%M%S)"
+echo "DAG 트리거: mentoai_pipeline (run_id=$RUN_ID)"
+docker compose exec -T airflow-scheduler airflow dags unpause mentoai_pipeline >/dev/null
+docker compose exec -T airflow-scheduler airflow dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
+
+for i in {1..180}; do
+  STATE=$(docker compose exec -T airflow-scheduler airflow dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
+import json
+import sys
+
+run_id = sys.argv[1]
+state = ""
+rows = json.load(sys.stdin)
+for row in rows:
+    if row.get("run_id") == run_id:
+        state = (row.get("state") or "").lower()
+        break
+print(state)
+PY
+)
+  if [ "$STATE" = "success" ]; then
+    echo "DAG 성공: $RUN_ID"
+    exit 0
+  fi
+  if [ "$STATE" = "failed" ]; then
+    echo "DAG 실패: $RUN_ID"
+    exit 1
+  fi
+  echo "[$i/180] DAG 상태: ${STATE:-running}"
+  sleep 20
+done
+
+echo "DAG 타임아웃(60분): $RUN_ID"
+exit 1
+'
+"""
+
+[tool.poe.tasks.pipeline-once-headless]
+help = "UI 없이 Airflow CLI(dags test)로 파이프라인 1회 실행 후 정리"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+
+if [ ! -f ../.env ]; then
+  echo ".env 파일이 필요합니다. README의 환경 변수 섹션을 먼저 설정하세요."
+  exit 1
+fi
+docker info >/dev/null 2>&1 || { echo "Docker 데몬이 실행 중이어야 합니다."; exit 1; }
+
+cleanup() {
+  docker compose rm -sf zookeeper kafka kafka-ui spark-master spark-worker airflow-webserver airflow-scheduler airflow-init minio minio-init || true
+}
+trap cleanup EXIT
+
+docker compose up -d --remove-orphans postgres minio minio-init zookeeper kafka spark-master spark-worker
+docker compose run --rm airflow-init || true
+
+LOGICAL_DATE="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+echo "Airflow DAG test 실행: mentoai_pipeline @ $LOGICAL_DATE"
+docker compose run --rm --no-deps airflow-scheduler bash -lc "airflow dags test mentoai_pipeline $LOGICAL_DATE"
+'
+"""
+
+[tool.poe.tasks.collect-once]
+help = "UI 없이 Kafka 수집기(producer_wanted.py) 1회 실행 후 정리"
+shell = """
+bash -lc '
+set -euo pipefail
+cd infra
+
+if [ ! -f ../.env ]; then
+  echo ".env 파일이 필요합니다. README의 환경 변수 섹션을 먼저 설정하세요."
+  exit 1
+fi
+docker info >/dev/null 2>&1 || { echo "Docker 데몬이 실행 중이어야 합니다."; exit 1; }
+
+cleanup() {
+  docker compose rm -sf zookeeper kafka kafka-ui || true
+}
+trap cleanup EXIT
+
+docker compose up -d --remove-orphans zookeeper kafka
+docker compose run --rm --no-deps airflow-scheduler python3 /opt/airflow/kafka/producer_wanted.py
+'
+"""
