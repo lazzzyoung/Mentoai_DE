@@ -77,6 +77,40 @@ cmd = "uv run uvicorn server.app.main:app --host 0.0.0.0 --port 8000"
 help = "APScheduler 기반 크롤러 실행"
 cmd = "uv run python -m server.app.services.scheduler_service"
 
+[tool.poe.tasks.run-bg]
+help = "서버와 스케줄러를 백그라운드로 실행"
+shell = """
+bash -lc '
+mkdir -p logs .run
+
+start_proc () {
+  name="$1"
+  cmd="$2"
+  pid_file=".run/${name}.pid"
+  log_file="logs/${name}.log"
+
+  if [ -f "$pid_file" ]; then
+    pid=$(cat "$pid_file" 2>/dev/null || true)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      echo "[skip] ${name} already running (pid=${pid})"
+      return
+    fi
+  fi
+
+  nohup bash -lc "$cmd" > "$log_file" 2>&1 &
+  new_pid=$!
+  echo "$new_pid" > "$pid_file"
+  echo "[ok] ${name} started (pid=${new_pid})"
+}
+
+start_proc "server" "uv run uvicorn server.app.main:app --host 0.0.0.0 --port 8000"
+start_proc "scheduler" "uv run python -m server.app.services.scheduler_service"
+
+echo "pid files: .run/server.pid .run/scheduler.pid"
+echo "log files: logs/server.log logs/scheduler.log"
+'
+"""
+
 [tool.poe.tasks.crawl-once]
 help = "크롤러/적재 파이프라인 1회 실행"
 cmd = "uv run python -m server.app.services.crawler_pipeline"
