@@ -43,7 +43,7 @@ def _stringify_skills(raw_skills: Any) -> str:
 def _build_full_text(job_data: dict[str, Any]) -> str:
     detail = job_data.get("detail") or {}
     company_name = (job_data.get("company") or {}).get("name", "미상")
-    position = job_data.get("position") or detail.get("position") or "미상"
+    position = _extract_position(job_data)
     main_tasks = detail.get("main_tasks") or ""
     requirements = detail.get("requirements") or ""
     preferred = detail.get("preferred_points") or ""
@@ -61,9 +61,14 @@ def _build_full_text(job_data: dict[str, Any]) -> str:
     ).strip()
 
 
+def _extract_position(job_data: dict[str, Any]) -> str:
+    detail = job_data.get("detail") or {}
+    return str(job_data.get("position") or detail.get("position") or "미상")
+
+
 def _to_record(job_id: int, job_data: dict[str, Any]) -> JobRecord:
     company_name = (job_data.get("company") or {}).get("name") or "미상"
-    position = job_data.get("position") or "미상"
+    position = _extract_position(job_data)
     skills_text = _stringify_skills(job_data.get("skill_tags") or [])
 
     return JobRecord(

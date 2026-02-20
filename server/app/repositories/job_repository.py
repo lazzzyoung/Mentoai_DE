@@ -15,6 +15,7 @@ from server.app.db import session_scope
 from server.app.models import Job, JobEmbedding
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9가-힣_+#.-]+")
+POSITION_LINE_PATTERN = re.compile(r"^\[포지션\]\s*(.+)$", re.MULTILINE)
 
 SQL_DELETE_FTS = "DELETE FROM jobs_fts WHERE job_id = :job_id"
 SQL_INSERT_FTS = """
@@ -85,11 +86,12 @@ def _run_sql(session: Any, sql: str, params: dict[str, Any]) -> None:
 
 def _row_to_candidate(row: Any, *, id_key: str, bm25_score: float) -> JobCandidate:
     mapping = cast(Mapping[str, Any], row._mapping)
+    full_text = str(mapping.get("full_text") or "")
     return JobCandidate(
         job_id=int(mapping[id_key]),
         company=str(mapping.get("company") or "미상"),
-        title=str(mapping.get("position") or "미상"),
-        content=str(mapping.get("full_text") or ""),
+        title=_resolve_position_title(mapping.get("position"), full_text),
+        content=full_text,
         skills_text=str(mapping.get("skills_text") or ""),
         bm25_score=float(mapping.get("bm25_score") or bm25_score),
     )
@@ -99,6 +101,20 @@ def _build_in_clause(prefix: str, values: Sequence[int]) -> tuple[str, dict[str,
     placeholders = ", ".join(f":{prefix}_{idx}" for idx, _ in enumerate(values))
     params = {f"{prefix}_{idx}": int(value) for idx, value in enumerate(values)}
     return placeholders, params
+
+
+def _resolve_position_title(raw_position: Any, full_text: str) -> str:
+    position = str(raw_position or "").strip()
+    if position and position != "미상":
+        return position
+
+    match = POSITION_LINE_PATTERN.search(full_text)
+    if match:
+        extracted = match.group(1).strip()
+        if extracted:
+            return extracted
+
+    return "미상"
 
 
 def _sync_jobs_fts(session: Any, job: Job) -> None:
@@ -228,10 +244,11 @@ async def fetch_job_detail(job_id: int) -> dict[str, Any]:
     if job is None:
         raise HTTPException(status_code=404, detail="해당 공고를 찾을 수 없습니다.")
 
+    title = _resolve_position_title(job.position, job.full_text)
     return {
         "job_id": int(job.id or 0),
         "company": job.company,
-        "title": job.position,
+        "title": title,
         "full_text": job.full_text,
         "skills_text": job.skills_text,
     }
