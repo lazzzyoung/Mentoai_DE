@@ -1,11 +1,14 @@
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from server.app.api.routes.v3 import router as v3_router
 from server.app.repositories.user_repository import close_pool
@@ -25,6 +28,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="MentoAI RAG Server", lifespan=lifespan)
+    allowed_hosts = [
+        host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()
+    ]
+    if allowed_hosts:
+        app.add_middleware(cast(Any, TrustedHostMiddleware), allowed_hosts=allowed_hosts)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/")
