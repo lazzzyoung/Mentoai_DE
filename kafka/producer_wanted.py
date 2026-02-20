@@ -6,6 +6,7 @@ import logging
 import requests
 from dotenv import load_dotenv
 from kafka import KafkaProducer
+from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import KafkaError
 load_dotenv() 
 
@@ -24,6 +25,24 @@ JOB_ID_CODE = os.getenv('TARGET_JOB_ID') # 데이터 엔지니어
 BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
 TOPIC_NAME = os.getenv('KAFKA_TOPIC_NAME', 'career_raw')
 
+def ensure_topic_exists(bootstrap_servers: str, topic_name: str) -> None:
+    try:
+        admin = KafkaAdminClient(bootstrap_servers=bootstrap_servers, client_id="mentoai-topic-init")
+        existing = set(admin.list_topics())
+        if topic_name in existing:
+            logger.info(f"Kafka topic already exists: {topic_name}")
+            admin.close()
+            return
+
+        admin.create_topics(
+            new_topics=[NewTopic(name=topic_name, num_partitions=1, replication_factor=1)],
+            validate_only=False,
+        )
+        admin.close()
+        logger.info(f"Kafka topic created: {topic_name}")
+    except Exception as e:
+        logger.warning(f"Kafka topic 선생성 실패(자동 생성에 위임): {topic_name}, error={e}")
+
 def run_producer():
     logger.info("🎬 Wanted Producer 시작...")
     
@@ -35,6 +54,7 @@ def run_producer():
             retries=3  
         )
         logger.info(f"Kafka Connected: {BOOTSTRAP_SERVERS}")
+        ensure_topic_exists(BOOTSTRAP_SERVERS, TOPIC_NAME)
     except Exception as e:
         logger.critical(f"Kafka 연결 실패! Error: {e}")
         return
