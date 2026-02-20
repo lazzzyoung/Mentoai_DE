@@ -14,6 +14,17 @@ set -euo pipefail
 DOMAIN="${1:?도메인을 넣어주세요. 예: api.example.com}"
 EMAIL="${2:?이메일을 넣어주세요. 예: admin@example.com}"
 PROJECT_DIR="${3:-$HOME/Mentoai_DE}"
+WWW_DOMAIN=""
+if [[ "$DOMAIN" != www.* ]]; then
+  WWW_DOMAIN="www.$DOMAIN"
+fi
+
+if [[ -n "$WWW_DOMAIN" ]]; then
+  ALLOWED_HOSTS_VALUE="$DOMAIN,$WWW_DOMAIN,localhost,127.0.0.1"
+else
+  ALLOWED_HOSTS_VALUE="$DOMAIN,localhost,127.0.0.1"
+fi
+
 INFRA_DIR="$PROJECT_DIR/infra"
 MAIN_PY="$PROJECT_DIR/server/app/main.py"
 ENV_FILE="$PROJECT_DIR/.env"
@@ -45,12 +56,17 @@ if [[ ! -f "$MAIN_PY" ]]; then
 fi
 
 echo "[1/7] Let's Encrypt 인증서 발급(또는 갱신)"
+CERTBOT_DOMAIN_ARGS=(-d "$DOMAIN")
+if [[ -n "$WWW_DOMAIN" ]]; then
+  CERTBOT_DOMAIN_ARGS+=(-d "$WWW_DOMAIN")
+fi
+
 sudo certbot certonly \
   --standalone \
   --non-interactive \
   --agree-tos \
   -m "$EMAIL" \
-  -d "$DOMAIN" \
+  "${CERTBOT_DOMAIN_ARGS[@]}" \
   --keep-until-expiring \
   --preferred-challenges http
 
@@ -99,9 +115,9 @@ echo "[3/7] .env에 ALLOWED_HOSTS 설정"
 mkdir -p "$(dirname "$ENV_FILE")"
 touch "$ENV_FILE"
 if grep -q '^ALLOWED_HOSTS=' "$ENV_FILE"; then
-  sed -i.bak "s|^ALLOWED_HOSTS=.*$|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|" "$ENV_FILE"
+  sed -i.bak "s|^ALLOWED_HOSTS=.*$|ALLOWED_HOSTS=$ALLOWED_HOSTS_VALUE|" "$ENV_FILE"
 else
-  echo "ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1" >> "$ENV_FILE"
+  echo "ALLOWED_HOSTS=$ALLOWED_HOSTS_VALUE" >> "$ENV_FILE"
 fi
 
 echo "[4/7] TLS용 compose override 파일 생성"
@@ -144,5 +160,8 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/mentoai-ai-server-reload.sh
 
 echo
 echo "완료: https://$DOMAIN/health"
+if [[ -n "$WWW_DOMAIN" ]]; then
+  echo "완료: https://$WWW_DOMAIN/health"
+fi
 echo "주의1) Lightsail 방화벽에서 80/443 허용 필요"
 echo "주의2) 8000 포트는 외부에서 닫는 것을 권장(방화벽)"
