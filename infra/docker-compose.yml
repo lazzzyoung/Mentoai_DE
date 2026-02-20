@@ -158,7 +158,7 @@ services:
       context: ./airflow              
       dockerfile: Dockerfile
     container_name: airflow-scheduler
-    command: scheduler
+    command: bash -lc "airflow scheduler"
     env_file:
       - ../.env
     environment:

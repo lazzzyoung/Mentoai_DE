@@ -406,12 +406,13 @@ cd infra
 AIRFLOW_BIN="/home/airflow/.local/bin/airflow"
 
 for i in {1..30}; do
-  if docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" db check >/dev/null 2>&1; then
+  if docker compose ps --status running --services 2>/dev/null | grep -qx 'airflow-scheduler' && \
+     docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN db check" >/dev/null 2>&1; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
-    docker compose ps airflow-scheduler || true
+    docker compose ps || true
     docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
@@ -492,12 +493,13 @@ docker compose up -d --remove-orphans \
   airflow-webserver airflow-scheduler
 
 for i in {1..30}; do
-  if docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" db check >/dev/null 2>&1; then
+  if docker compose ps --status running --services 2>/dev/null | grep -qx 'airflow-scheduler' && \
+     docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN db check" >/dev/null 2>&1; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
-    docker compose ps airflow-scheduler || true
+    docker compose ps || true
     docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
@@ -568,15 +570,17 @@ trap cleanup EXIT
 
 docker compose up -d --remove-orphans postgres qdrant minio minio-init zookeeper kafka spark-master spark-worker
 docker compose run --rm airflow-init || true
+docker compose rm -sf airflow-scheduler >/dev/null 2>&1 || true
 docker compose up -d --remove-orphans airflow-scheduler
 
 for i in {1..30}; do
-  if docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" db check >/dev/null 2>&1; then
+  if docker compose ps --status running --services 2>/dev/null | grep -qx 'airflow-scheduler' && \
+     docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN db check" >/dev/null 2>&1; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "airflow-scheduler 준비 타임아웃"
-    docker compose ps airflow-scheduler || true
+    docker compose ps || true
     docker compose logs --tail=120 airflow-scheduler || true
     exit 1
   fi
@@ -585,11 +589,11 @@ done
 
 RUN_ID="headless_$(date +%Y%m%d_%H%M%S)"
 echo "DAG 트리거: mentoai_pipeline (run_id=$RUN_ID)"
-docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags unpause mentoai_pipeline >/dev/null
-docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags trigger mentoai_pipeline --run-id "$RUN_ID" >/dev/null
+docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN dags unpause mentoai_pipeline" >/dev/null
+docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN dags trigger mentoai_pipeline --run-id $RUN_ID" >/dev/null
 
 for i in {1..180}; do
-  STATE=$(docker compose exec -T airflow-scheduler "$AIRFLOW_BIN" dags list-runs -d mentoai_pipeline --output json 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
+  STATE=$(docker compose exec -T airflow-scheduler bash -lc "$AIRFLOW_BIN dags list-runs -d mentoai_pipeline --output json" 2>/dev/null | python3 - "$RUN_ID" <<'"'"'PY'"'"'
 import json
 import sys
 
