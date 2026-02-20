@@ -63,6 +63,12 @@ uv run poe run-scheduler
 uv run poe crawl-once
 ```
 
+데이터(SQLite) 리셋:
+
+```bash
+uv run poe reset-data
+```
+
 ---
 
 ## 3) 개발 품질 명령

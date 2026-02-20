@@ -81,6 +81,10 @@ cmd = "uv run python -m server.app.services.scheduler_service"
 help = "크롤러/적재 파이프라인 1회 실행"
 cmd = "uv run python -m server.app.services.crawler_pipeline"
 
+[tool.poe.tasks.reset-data]
+help = "SQLite 데이터 파일 리셋(.db/.db-wal/.db-shm/.db-journal 삭제)"
+cmd = "uv run python -m server.app.scripts.reset_sqlite_data"
+
 [tool.poe.tasks.env-init]
 help = ".env 파일 생성 및 누락 키 보강(멱등)"
 shell = """
