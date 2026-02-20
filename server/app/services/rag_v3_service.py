@@ -132,7 +132,13 @@ async def recommend_jobs_list(user_id: int, limit: int | None = None) -> Recomme
         user_profile = _to_user_profile(user_info)
         query_text = _build_user_query_text(user_profile)
 
-        ranked_jobs = await retrieve_jobs(query_text, limit=_resolve_recommendation_limit(limit))
+        ranked_jobs = await retrieve_jobs(
+            query_text,
+            desired_job=user_profile.desired_job,
+            career_years=user_profile.career_years,
+            skills=user_profile.skills,
+            limit=_resolve_recommendation_limit(limit),
+        )
         recommendations = _to_recommendations(ranked_jobs)
 
         return RecommendationListResponse(

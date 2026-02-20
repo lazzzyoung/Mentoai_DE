@@ -42,6 +42,7 @@ uv run poe env-init
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
 - `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
+- `RANK_RETRIEVAL_WEIGHT` (기본: `0.7`, 검색점수 vs 프로필점수 결합 비율)
 
 > 계정에서 `gpt-5-mini` 접근이 안 되면 `ANALYSIS_MODEL=gpt-4o-mini`로 설정하세요.
 > 이전 변수명 `OPENAI_MODEL`도 하위호환으로 인식합니다.
@@ -90,7 +91,10 @@ uv run poe check
 1. 사용자 프로필 텍스트 생성
 2. FTS5에서 후보 공고 조회
 3. query embedding vs 후보 embedding 코사인 재랭크
-4. 결합 점수로 상위 공고 반환
+4. 프로필 점수(직무/기술/경력) 계산
+5. retrieval + profile 결합 점수로 상위 공고 반환
+
+> 경력 구간별 가중치 상세는 `docs/rag_weighting_strategy.md` 참고
 
 ### 상세 분석 흐름
 - 공고 단건 조회 후 LLM 분석
