@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 목적:
-# - nginx 없이 443 -> 8000 리다이렉트
+# - nginx 없이 host 443 포트를 ai-server:8000으로 직접 바인딩
 # - Let's Encrypt 인증서 적용
 # - FastAPI에서 특정 도메인 Host 헤더만 허용(TrustedHostMiddleware)
 #
@@ -28,14 +28,6 @@ require_cmd() {
 has_dns_record() {
   local host="$1"
   getent ahosts "$host" >/dev/null 2>&1
-}
-
-add_iptables_rule() {
-  # 중복 추가 방지
-  local table="$1"; shift
-  if ! sudo iptables -t "$table" -C "$@" 2>/dev/null; then
-    sudo iptables -t "$table" -A "$@"
-  fi
 }
 
 del_iptables_rule_if_exists() {
@@ -74,9 +66,11 @@ else
   ALLOWED_HOSTS_VALUE="$DOMAIN,localhost,127.0.0.1"
 fi
 
-echo "[0/7] certbot standalone 방해 가능 규칙 정리(80->8000 리다이렉트 제거)"
+echo "[0/7] 과거 리다이렉트 규칙 정리(컨테이너 outbound 443 장애 방지)"
 del_iptables_rule_if_exists nat PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8000
 del_iptables_rule_if_exists nat OUTPUT -p tcp -o lo --dport 80 -j REDIRECT --to-ports 8000
+del_iptables_rule_if_exists nat PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports 8000
+del_iptables_rule_if_exists nat OUTPUT -p tcp -o lo --dport 443 -j REDIRECT --to-ports 8000
 
 echo "[1/7] Let's Encrypt 인증서 발급(또는 갱신)"
 CERTBOT_DOMAIN_ARGS=(-d "$DOMAIN")
@@ -147,6 +141,8 @@ echo "[4/7] TLS용 compose override 파일 생성"
 cat > "$OVERRIDE_FILE" <<YAML
 services:
   ai-server:
+    ports:
+      - "443:8000"
     volumes:
       - ../server:/app/server
       - /etc/letsencrypt:/etc/letsencrypt:ro
@@ -162,9 +158,7 @@ echo "[5/7] ai-server 재기동 (TLS 적용)"
   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --force-recreate ai-server
 )
 
-echo "[6/7] Linux 레벨 443 -> 8000 리다이렉트"
-add_iptables_rule nat PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports 8000
-add_iptables_rule nat OUTPUT -p tcp -o lo --dport 443 -j REDIRECT --to-ports 8000
+echo "[6/7] iptables 영속화(리다이렉트 규칙은 정리된 상태 저장)"
 
 # 규칙 영속화(가능한 경우)
 if command -v netfilter-persistent >/dev/null 2>&1; then
@@ -187,4 +181,4 @@ if [[ -n "$WWW_DOMAIN" ]]; then
   echo "완료: https://$WWW_DOMAIN/health"
 fi
 echo "주의1) Lightsail 방화벽에서 80/443 허용 필요"
-echo "주의2) 8000 포트는 외부에서 닫는 것을 권장(방화벽)"
+echo "주의2) 외부 인바운드는 443(필수), 80(인증서용)만 권장"
