@@ -39,7 +39,9 @@ def test_reason_message_is_restored_to_previous_tone() -> None:
 
     assert _build_reason(candidate, 0.9) == "경험과 기술 맥락이 공고 요구사항과 잘 맞습니다."
     assert "일부 일치" in _build_reason(candidate, 0.3)
-    assert _build_reason(candidate_without_skills, 0.3) == "희망 직무와 공고 핵심 내용이 유사합니다."
+    assert (
+        _build_reason(candidate_without_skills, 0.3) == "희망 직무와 공고 핵심 내용이 유사합니다."
+    )
 
 
 def test_resolve_recommendation_limit_keeps_enough_pool_for_paging(monkeypatch) -> None:

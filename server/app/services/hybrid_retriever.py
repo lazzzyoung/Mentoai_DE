@@ -94,7 +94,8 @@ def _extract_required_career_bounds(text: str) -> tuple[int | None, int | None]:
         max_year = high if max_year is None else min(max_year, high)
 
     min_candidates = [
-        int(value) for value in CAREER_MIN_PATTERN.findall(source) + CAREER_PLUS_PATTERN.findall(source)
+        int(value)
+        for value in CAREER_MIN_PATTERN.findall(source) + CAREER_PLUS_PATTERN.findall(source)
     ]
     if min_candidates:
         parsed_min = max(min_candidates)

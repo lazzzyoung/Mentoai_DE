@@ -266,7 +266,9 @@ async def _run_llm_analysis(
     _log_llm_token_usage(response)
 
     try:
-        raw_content = response.content if isinstance(response.content, str) else str(response.content or "")
+        raw_content = (
+            response.content if isinstance(response.content, str) else str(response.content or "")
+        )
         result = parser.parse(raw_content)
     except Exception as error:
         logger.warning("LLM 응답 파싱 실패로 fallback 분석을 사용합니다: %s", error)
@@ -303,7 +305,9 @@ def _log_llm_token_usage(response: Any) -> None:
             break
 
     if cached_tokens is None:
-        usage_details = usage_meta.get("input_token_details") or usage_meta.get("prompt_token_details")
+        usage_details = usage_meta.get("input_token_details") or usage_meta.get(
+            "prompt_token_details"
+        )
         if isinstance(usage_details, dict):
             raw_cached = usage_details.get("cached_tokens", usage_details.get("cache_read"))
             if raw_cached is not None:
@@ -363,9 +367,7 @@ async def _get_cached_analysis(key: str) -> dict[str, Any] | None:
     async with _analysis_cache_lock:
         if now - _last_cache_sweep_at >= sweep_interval:
             expired_keys = [
-                cache_key
-                for cache_key, entry in _analysis_cache.items()
-                if entry.expires_at <= now
+                cache_key for cache_key, entry in _analysis_cache.items() if entry.expires_at <= now
             ]
             for expired_key in expired_keys:
                 _analysis_cache.pop(expired_key, None)
@@ -394,9 +396,7 @@ async def _set_cached_analysis(key: str, payload: dict[str, Any]) -> None:
     async with _analysis_cache_lock:
         if now - _last_cache_sweep_at >= sweep_interval:
             expired_keys = [
-                cache_key
-                for cache_key, entry in _analysis_cache.items()
-                if entry.expires_at <= now
+                cache_key for cache_key, entry in _analysis_cache.items() if entry.expires_at <= now
             ]
             for expired_key in expired_keys:
                 _analysis_cache.pop(expired_key, None)
