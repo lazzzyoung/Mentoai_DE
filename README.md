@@ -34,6 +34,8 @@ uv sync
 uv run poe env-init
 ```
 
+Linux x86_64에서는 torch CPU wheel 호환성을 위해 `numpy<2`가 고정됩니다.
+
 `.env`에서 최소 설정:
 
 - `OPENAI_API_KEY`
@@ -112,7 +114,7 @@ uv run poe check
 ## 5) Ubuntu 운영 스크립트
 
 - `setup_ubuntu.sh`: swap + uv + python + sqlite + certbot 설치
-- `setup_https_domain_only.sh`: certbot 인증서 + uvicorn HTTPS(systemd) 구성
+- `setup_https_domain_only.sh`: certbot 인증서 + uvicorn HTTPS(systemd) 구성 (`<DOMAIN>`은 FQDN만, `https://`/끝 `/` 제외)
 
 ---
 

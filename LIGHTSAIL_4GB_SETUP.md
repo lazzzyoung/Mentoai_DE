@@ -53,6 +53,9 @@ chmod +x setup_https_domain_only.sh
 bash setup_https_domain_only.sh <DOMAIN> <EMAIL> /home/ubuntu/Mentoai_DE
 ```
 
+`<DOMAIN>`에는 `https://` 또는 끝 `/` 없이 FQDN만 넣으세요.  
+예: `mentoai.kro.kr` (O), `https://mentoai.kro.kr/` (X)
+
 완료 후:
 ```bash
 curl -i https://<DOMAIN>/health
@@ -66,4 +69,3 @@ uv run poe crawl-once
 # 품질 검사
 uv run poe check
 ```
-
