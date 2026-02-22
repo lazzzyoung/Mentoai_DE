@@ -72,6 +72,10 @@ sequence = [
   { cmd = "uv run pytest" },
 ]
 
+[tool.poe.tasks.format]
+help = "코드 포맷팅 적용"
+cmd = "uv run ruff format server tests"
+
 [tool.poe.tasks.run-server]
 help = "FastAPI 서버 실행"
 cmd = "uv run uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload"

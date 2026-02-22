@@ -83,6 +83,7 @@ uv run poe reset-data
 ## 3) 개발 품질 명령
 
 ```bash
+uv run poe format
 uv run poe check
 ```
 
