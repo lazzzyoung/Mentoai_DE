@@ -45,6 +45,7 @@ Linux x86_64에서는 torch CPU wheel 호환성을 위해 `numpy<2`가 고정됩
 - `OPENAI_PROMPT_CACHE_RETENTION` (기본: 비움/미설정)
 - `SQLITE_DB_PATH`
 - `CRAWLER_INTERVAL_MINUTES`
+- `CRAWLER_FETCH_LIMIT` (기본: `50`, 크롤러 1회 수집 건수)
 - `RECOMMENDATION_LIMIT` (기본: `20`, 추천 카드 초기 풀 크기)
 - `RANK_RETRIEVAL_WEIGHT` (기본: `0.7`, 검색점수 vs 프로필점수 결합 비율)
 - `ANALYSIS_CACHE_TTL_SECONDS` (기본: `900`)

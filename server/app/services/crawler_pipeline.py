@@ -8,7 +8,7 @@ from typing import Any
 
 import requests
 
-from server.app.core.config import TARGET_JOB_GROUP, TARGET_JOB_ID, WANTED_BASE_URL
+from server.app.core.config import CRAWLER_FETCH_LIMIT, TARGET_JOB_GROUP, TARGET_JOB_ID, WANTED_BASE_URL
 from server.app.crawlers.wanted import fetch_job_detail_raw, fetch_job_id_list
 from server.app.repositories.job_repository import JobRecord, upsert_embedding, upsert_jobs
 from server.app.services.embedding_service import embed_text
@@ -93,8 +93,9 @@ def _to_record(job_id: int, job_data: dict[str, Any]) -> JobRecord:
     )
 
 
-async def run_crawl_pipeline(limit: int = 50) -> CrawlResult:
+async def run_crawl_pipeline(limit: int | None = None) -> CrawlResult:
     """Wanted 크롤링부터 임베딩 저장까지 한 번에 수행한다."""
+    fetch_limit = max(1, int(limit if limit is not None else CRAWLER_FETCH_LIMIT))
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -112,7 +113,7 @@ async def run_crawl_pipeline(limit: int = 50) -> CrawlResult:
             base_url=WANTED_BASE_URL,
             group_id=TARGET_JOB_GROUP,
             job_id=TARGET_JOB_ID,
-            limit=limit,
+            limit=fetch_limit,
         )
 
         for job_id in job_ids:
