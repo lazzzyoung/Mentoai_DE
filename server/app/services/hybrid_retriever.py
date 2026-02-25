@@ -27,6 +27,13 @@ ROLE_ALIASES: dict[str, tuple[str, ...]] = {
         "server developer",
         "server engineer",
         "api engineer",
+        "application engineer",
+        "platform engineer",
+        "java engineer",
+        "spring engineer",
+        "백엔드 엔지니어",
+        "서버 엔지니어",
+        "플랫폼 엔지니어",
     ),
     "frontend": (
         "frontend",
@@ -34,22 +41,81 @@ ROLE_ALIASES: dict[str, tuple[str, ...]] = {
         "프론트엔드",
         "front",
         "웹 프론트",
+        "ui engineer",
+        "client engineer",
+        "프론트엔드 엔지니어",
+        "클라이언트 개발",
     ),
     "data": (
         "data engineer",
+        "data engineering",
+        "data platform engineer",
+        "data pipeline engineer",
+        "data warehouse engineer",
+        "big data engineer",
+        "bi engineer",
         "데이터 엔지니어",
-        "analytics engineer",
+        "데이터 엔지니어링",
+        "데이터 플랫폼 엔지니어",
+        "데이터 파이프라인 엔지니어",
+        "데이터 웨어하우스 엔지니어",
+        "데이터 플랫폼",
+        "데이터 분석가",
         "데이터 파이프라인",
+        "데이터 레이크",
+        "data analytics engineer",
+        "data analyst",
+        "analytics engineer",
+        "analytics",
         "etl",
         "data platform",
     ),
     "ai": (
         "ai engineer",
         "ml engineer",
+        "machine learning engineer",
+        "llm engineer",
+        "ai research engineer",
         "machine learning",
         "인공지능",
         "머신러닝",
         "딥러닝",
+        "ai 개발자",
+    ),
+    "devops": (
+        "devops",
+        "dev ops",
+        "sre",
+        "site reliability engineer",
+        "platform ops",
+        "infra engineer",
+        "infrastructure engineer",
+        "클라우드 엔지니어",
+        "데브옵스",
+        "인프라 엔지니어",
+    ),
+    "mobile": (
+        "ios engineer",
+        "android engineer",
+        "mobile engineer",
+        "react native",
+        "flutter",
+        "모바일 개발자",
+        "앱 개발자",
+    ),
+    "qa": (
+        "qa engineer",
+        "test engineer",
+        "quality assurance",
+        "테스트 엔지니어",
+        "품질 엔지니어",
+    ),
+    "security": (
+        "security engineer",
+        "application security",
+        "cloud security",
+        "정보보안",
+        "보안 엔지니어",
     ),
     "design": (
         "designer",
@@ -64,13 +130,30 @@ ROLE_ALIASES: dict[str, tuple[str, ...]] = {
         "product owner",
         "서비스 기획",
         "기획자",
+        "pm",
+        "po",
     ),
     "marketing": (
         "marketer",
         "marketing",
         "마케터",
         "브랜드 마케팅",
+        "그로스 마케팅",
+        "퍼포먼스 마케팅",
     ),
+}
+ROLE_RELATED_FAMILIES: dict[str, tuple[str, ...]] = {
+    "backend": ("data", "ai"),
+    "data": ("backend", "ai"),
+    "ai": ("data", "backend"),
+    "devops": ("backend", "data", "security"),
+    "security": ("devops", "backend"),
+    "mobile": ("frontend", "backend"),
+    "qa": ("backend", "frontend", "mobile"),
+    "frontend": ("design",),
+    "design": ("frontend", "pm"),
+    "pm": ("design", "marketing"),
+    "marketing": ("pm",),
 }
 
 
@@ -102,7 +185,7 @@ def _contains_alias(normalized_text: str, normalized_tokens: set[str], alias: st
     target = _normalize_role_text(alias)
     if not target:
         return False
-    if len(target) <= 2 and target.isalpha():
+    if " " not in target:
         return target in normalized_tokens
     return target in normalized_text
 
@@ -125,7 +208,19 @@ def _canonicalize_desired_role(desired_job: str) -> str | None:
     if not roles:
         return None
 
-    for preferred in ("backend", "frontend", "data", "ai", "pm", "design", "marketing"):
+    for preferred in (
+        "backend",
+        "frontend",
+        "data",
+        "ai",
+        "devops",
+        "mobile",
+        "qa",
+        "security",
+        "pm",
+        "design",
+        "marketing",
+    ):
         if preferred in roles:
             return preferred
     return next(iter(roles))
@@ -227,6 +322,9 @@ def _role_match_score(desired_job: str, candidate: job_repository.JobCandidate) 
     if desired_role:
         if desired_role in candidate_roles:
             return 1.0
+        related_roles = set(ROLE_RELATED_FAMILIES.get(desired_role, ()))
+        if related_roles and related_roles.intersection(candidate_roles):
+            return 0.6
         if candidate_roles:
             return 0.05
 

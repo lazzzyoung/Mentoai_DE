@@ -10,3 +10,10 @@ def test_build_match_query_removes_profile_labels_and_year_token() -> None:
     assert "3년" not in query
     assert "backend" in query
 
+
+def test_build_match_query_expands_data_engineer_phrase() -> None:
+    query = _build_match_query("희망직무: 데이터 엔지니어, 보유기술: Python, 경력: 5년")
+
+    assert "데이터 엔지니어" in query
+    assert "data engineer" in query
+    assert "etl" in query

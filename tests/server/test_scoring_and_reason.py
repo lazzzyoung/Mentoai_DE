@@ -159,3 +159,34 @@ def test_skills_match_splits_compound_skill_text() -> None:
     )
 
     assert _skills_match_score(["JPA/Hibernate"], candidate) == 1.0
+
+
+def test_role_match_groups_data_engineer_family_flexibly() -> None:
+    data_platform_candidate = JobCandidate(
+        job_id=8,
+        company="테스트",
+        title="Data Platform Engineer",
+        content="대용량 데이터 파이프라인과 웨어하우스를 구축합니다.",
+        skills_text="Python, Spark",
+        bm25_score=0.0,
+    )
+    backend_candidate = JobCandidate(
+        job_id=9,
+        company="테스트",
+        title="백엔드 엔지니어",
+        content="API/서버 설계",
+        skills_text="Java, Spring",
+        bm25_score=0.0,
+    )
+    marketer_candidate = JobCandidate(
+        job_id=10,
+        company="테스트",
+        title="브랜드 마케터",
+        content="브랜드 캠페인 기획",
+        skills_text="",
+        bm25_score=0.0,
+    )
+
+    assert _role_match_score("데이터 엔지니어", data_platform_candidate) >= 0.9
+    assert _role_match_score("데이터 엔지니어", backend_candidate) >= 0.5
+    assert _role_match_score("데이터 엔지니어", marketer_candidate) <= 0.1

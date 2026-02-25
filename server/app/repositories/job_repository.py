@@ -22,16 +22,44 @@ ROLE_QUERY_EXPANSIONS: dict[str, tuple[str, ...]] = {
     "backend": ("백엔드", "서버", "api"),
     "back-end": ("백엔드", "서버"),
     "백엔드": ("backend", "server", "api"),
+    "server": ("backend", "백엔드", "api"),
+    "서버": ("backend", "백엔드", "api"),
     "frontend": ("프론트엔드", "웹"),
     "front-end": ("프론트엔드", "웹"),
     "프론트엔드": ("frontend", "front"),
+    "데브옵스": ("devops", "sre", "infra"),
+    "devops": ("데브옵스", "sre", "인프라"),
+    "sre": ("devops", "데브옵스", "인프라"),
+    "인프라": ("infra", "devops", "클라우드"),
+    "모바일": ("mobile", "ios", "android"),
+    "ios": ("mobile", "swift", "앱"),
+    "android": ("mobile", "kotlin", "앱"),
+    "qa": ("test", "테스트", "품질"),
+    "보안": ("security", "application security"),
     "data": ("데이터", "etl"),
-    "데이터": ("data", "analytics"),
+    "데이터": ("data", "analytics", "pipeline", "warehouse"),
+    "analytics": ("data", "데이터", "분석"),
+    "파이프라인": ("data", "etl"),
+    "엔지니어링": ("engineering", "engineer"),
     "designer": ("디자이너", "ux", "ui"),
     "디자이너": ("designer", "ux", "ui"),
     "pm": ("기획", "product"),
     "po": ("기획", "product"),
     "마케터": ("marketing", "marketer"),
+}
+ROLE_PHRASE_EXPANSIONS: dict[str, tuple[str, ...]] = {
+    "데이터 엔지니어": ("data engineer", "데이터", "etl", "pipeline", "warehouse"),
+    "data engineer": ("데이터 엔지니어", "data", "etl", "analytics"),
+    "데이터 플랫폼": ("data platform", "데이터", "pipeline", "warehouse"),
+    "analytics engineer": ("데이터 엔지니어", "analytics", "etl"),
+    "백엔드 엔지니어": ("backend", "백엔드", "server", "api"),
+    "server developer": ("backend", "백엔드", "server"),
+    "프론트엔드 엔지니어": ("frontend", "프론트엔드", "web"),
+    "모바일 개발자": ("mobile", "ios", "android", "앱"),
+    "devops engineer": ("devops", "sre", "infra", "인프라"),
+    "보안 엔지니어": ("security", "보안", "application security"),
+    "product manager": ("pm", "po", "기획"),
+    "프로덕트 디자이너": ("product designer", "designer", "ux", "ui"),
 }
 
 SQL_DELETE_FTS = "DELETE FROM jobs_fts WHERE job_id = :job_id"
@@ -79,11 +107,27 @@ def _build_match_query(user_query: str) -> str:
     tokens = [token.strip() for token in TOKEN_PATTERN.findall(user_query or "") if token.strip()]
     unique_tokens: list[str] = []
     seen: set[str] = set()
+    normalized_query = " ".join((user_query or "").lower().replace("-", " ").replace("/", " ").split())
+
+    def append_token(raw: str) -> None:
+        token = raw.strip()
+        if not token:
+            return
+        key = token.lower()
+        if key in seen:
+            return
+        unique_tokens.append(token)
+        seen.add(key)
+
+    for phrase, expansions in ROLE_PHRASE_EXPANSIONS.items():
+        if phrase.lower() not in normalized_query:
+            continue
+        append_token(phrase)
+        for expanded in expansions:
+            append_token(expanded)
 
     for token in tokens:
         key = token.lower()
-        if key in seen:
-            continue
         if token in MATCH_QUERY_STOPWORDS or key in MATCH_QUERY_STOPWORDS:
             continue
         if YEAR_TOKEN_PATTERN.fullmatch(token):
@@ -91,14 +135,9 @@ def _build_match_query(user_query: str) -> str:
         if len(token) <= 1 and key not in {"c", "r"}:
             continue
 
-        unique_tokens.append(token)
-        seen.add(key)
+        append_token(token)
         for expanded in ROLE_QUERY_EXPANSIONS.get(key, ()):
-            expanded_key = expanded.lower()
-            if expanded_key in seen:
-                continue
-            unique_tokens.append(expanded)
-            seen.add(expanded_key)
+            append_token(expanded)
 
     return " OR ".join(unique_tokens[:12])
 
