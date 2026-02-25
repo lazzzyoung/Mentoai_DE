@@ -17,3 +17,11 @@ def test_build_match_query_expands_data_engineer_phrase() -> None:
     assert "데이터 엔지니어" in query
     assert "data engineer" in query
     assert "etl" in query
+
+
+def test_build_match_query_expands_front_variants() -> None:
+    query = _build_match_query("희망직무: 프런트, 보유기술: React, 경력: 2년")
+
+    assert "프런트" in query
+    assert "frontend" in query
+    assert "front" in query

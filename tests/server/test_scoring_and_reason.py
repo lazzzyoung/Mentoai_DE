@@ -190,3 +190,27 @@ def test_role_match_groups_data_engineer_family_flexibly() -> None:
     assert _role_match_score("데이터 엔지니어", data_platform_candidate) >= 0.9
     assert _role_match_score("데이터 엔지니어", backend_candidate) >= 0.5
     assert _role_match_score("데이터 엔지니어", marketer_candidate) <= 0.1
+
+
+def test_role_match_accepts_front_korean_variants() -> None:
+    frontend_candidate = JobCandidate(
+        job_id=11,
+        company="테스트",
+        title="프런트엔드 개발자",
+        content="React 기반 UI 개발",
+        skills_text="React, TypeScript",
+        bm25_score=0.0,
+    )
+    backend_candidate = JobCandidate(
+        job_id=12,
+        company="테스트",
+        title="백엔드 개발자",
+        content="Spring 기반 API 개발",
+        skills_text="Java, Spring",
+        bm25_score=0.0,
+    )
+
+    assert _role_match_score("front", frontend_candidate) >= 0.9
+    assert _role_match_score("프론트", frontend_candidate) >= 0.9
+    assert _role_match_score("프런트", frontend_candidate) >= 0.9
+    assert _role_match_score("프론트", backend_candidate) <= 0.1
