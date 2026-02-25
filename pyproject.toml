@@ -118,6 +118,47 @@ echo "log files: logs/server.log logs/scheduler.log"
 '
 """
 
+[tool.poe.tasks.stop-bg]
+help = "백그라운드 서버/스케줄러 중지"
+shell = """
+bash -lc '
+stop_proc () {
+  name="$1"
+  pid_file=".run/${name}.pid"
+
+  if [ ! -f "$pid_file" ]; then
+    echo "[skip] ${name} pid file not found"
+    return
+  fi
+
+  pid=$(cat "$pid_file" 2>/dev/null || true)
+  if [ -z "$pid" ]; then
+    echo "[warn] ${name} pid file is empty"
+    rm -f "$pid_file"
+    return
+  fi
+
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    sleep 0.5
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+      echo "[force] ${name} stopped (pid=${pid})"
+    else
+      echo "[ok] ${name} stopped (pid=${pid})"
+    fi
+  else
+    echo "[skip] ${name} not running (stale pid=${pid})"
+  fi
+
+  rm -f "$pid_file"
+}
+
+stop_proc "server"
+stop_proc "scheduler"
+'
+"""
+
 [tool.poe.tasks.crawl-once]
 help = "크롤러/적재 파이프라인 1회 실행"
 cmd = "uv run python -m server.app.services.crawler_pipeline"

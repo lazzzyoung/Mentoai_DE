@@ -66,6 +66,13 @@ uv run poe run-server
 uv run poe run-scheduler
 ```
 
+서버+스케줄러 백그라운드 실행/중지:
+
+```bash
+uv run poe run-bg
+uv run poe stop-bg
+```
+
 크롤러 1회 실행:
 
 ```bash
