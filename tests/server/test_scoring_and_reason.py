@@ -4,6 +4,8 @@ from server.app.services.hybrid_retriever import (
     _build_reason,
     _compute_profile_score,
     _profile_weights_for_career,
+    _role_match_score,
+    _skills_match_score,
 )
 from server.app.services.rag_v3_service import _resolve_recommendation_limit, _to_match_score
 
@@ -122,3 +124,38 @@ def test_reason_highlights_career_gap_when_needed() -> None:
         career_score=0.2,
     )
     assert "경력" in reason
+
+
+def test_role_match_supports_korean_and_english_backend_aliases() -> None:
+    backend_candidate = JobCandidate(
+        job_id=5,
+        company="테스트",
+        title="백엔드 엔지니어",
+        content="결제 서버 운영",
+        skills_text="Java, Spring",
+        bm25_score=0.0,
+    )
+    frontend_candidate = JobCandidate(
+        job_id=6,
+        company="테스트",
+        title="프론트엔드 개발자",
+        content="React 기반 웹 프론트 개발",
+        skills_text="TypeScript, React",
+        bm25_score=0.0,
+    )
+
+    assert _role_match_score("backend", backend_candidate) >= 0.9
+    assert _role_match_score("backend", frontend_candidate) <= 0.1
+
+
+def test_skills_match_splits_compound_skill_text() -> None:
+    candidate = JobCandidate(
+        job_id=7,
+        company="테스트",
+        title="백엔드 엔지니어",
+        content="JPA와 Hibernate 기반으로 도메인 모델링을 진행합니다.",
+        skills_text="",
+        bm25_score=0.0,
+    )
+
+    assert _skills_match_score(["JPA/Hibernate"], candidate) == 1.0

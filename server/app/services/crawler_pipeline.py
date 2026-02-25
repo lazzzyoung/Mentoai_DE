@@ -26,18 +26,27 @@ class CrawlResult:
 def _stringify_skills(raw_skills: Any) -> str:
     if not isinstance(raw_skills, list):
         return ""
-
     values: list[str] = []
     for item in raw_skills:
         if isinstance(item, dict):
-            name = str(item.get("name") or "").strip()
+            name = str(item.get("name") or item.get("text") or item.get("title") or "").strip()
             if name:
                 values.append(name)
         else:
             text = str(item).strip()
             if text:
                 values.append(text)
-    return ", ".join(values)
+
+    deduplicated: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduplicated.append(value)
+
+    return ", ".join(deduplicated)
 
 
 def _build_full_text(job_data: dict[str, Any]) -> str:
@@ -69,7 +78,9 @@ def _extract_position(job_data: dict[str, Any]) -> str:
 def _to_record(job_id: int, job_data: dict[str, Any]) -> JobRecord:
     company_name = (job_data.get("company") or {}).get("name") or "미상"
     position = _extract_position(job_data)
-    skills_text = _stringify_skills(job_data.get("skill_tags") or [])
+    skills_text = _stringify_skills(
+        (job_data.get("skill_tags") or []) + (job_data.get("preferred_languages") or [])
+    )
 
     return JobRecord(
         source="wanted",

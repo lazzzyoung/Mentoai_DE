@@ -20,6 +20,21 @@ def test_to_record_uses_detail_position_when_top_level_is_missing() -> None:
     assert "[포지션] 데이터 엔지니어" in record.full_text
 
 
+def test_to_record_extracts_skill_tags_from_text_key() -> None:
+    record = _to_record(
+        102,
+        {
+            "company": {"name": "테스트회사"},
+            "position": "백엔드 엔지니어",
+            "skill_tags": [{"text": "Java"}, {"text": "Spring Boot"}],
+            "preferred_languages": [{"text": "Kotlin"}],
+            "detail": {},
+        },
+    )
+
+    assert record.skills_text == "Java, Spring Boot, Kotlin"
+
+
 @pytest.mark.anyio
 async def test_search_and_detail_fallback_to_position_from_full_text(tmp_path) -> None:
     db_file = tmp_path / "job_title.db"

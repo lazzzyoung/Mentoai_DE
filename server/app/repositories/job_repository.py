@@ -16,6 +16,23 @@ from server.app.models import Job, JobEmbedding
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9가-힣_+#.-]+")
 POSITION_LINE_PATTERN = re.compile(r"^\[포지션\]\s*(.+)$", re.MULTILINE)
+YEAR_TOKEN_PATTERN = re.compile(r"^\d+\s*년?$")
+MATCH_QUERY_STOPWORDS = {"희망직무", "보유기술", "경력", "없음", "미입력", "년"}
+ROLE_QUERY_EXPANSIONS: dict[str, tuple[str, ...]] = {
+    "backend": ("백엔드", "서버", "api"),
+    "back-end": ("백엔드", "서버"),
+    "백엔드": ("backend", "server", "api"),
+    "frontend": ("프론트엔드", "웹"),
+    "front-end": ("프론트엔드", "웹"),
+    "프론트엔드": ("frontend", "front"),
+    "data": ("데이터", "etl"),
+    "데이터": ("data", "analytics"),
+    "designer": ("디자이너", "ux", "ui"),
+    "디자이너": ("designer", "ux", "ui"),
+    "pm": ("기획", "product"),
+    "po": ("기획", "product"),
+    "마케터": ("marketing", "marketer"),
+}
 
 SQL_DELETE_FTS = "DELETE FROM jobs_fts WHERE job_id = :job_id"
 SQL_INSERT_FTS = """
@@ -67,10 +84,23 @@ def _build_match_query(user_query: str) -> str:
         key = token.lower()
         if key in seen:
             continue
+        if token in MATCH_QUERY_STOPWORDS or key in MATCH_QUERY_STOPWORDS:
+            continue
+        if YEAR_TOKEN_PATTERN.fullmatch(token):
+            continue
+        if len(token) <= 1 and key not in {"c", "r"}:
+            continue
+
         unique_tokens.append(token)
         seen.add(key)
+        for expanded in ROLE_QUERY_EXPANSIONS.get(key, ()):
+            expanded_key = expanded.lower()
+            if expanded_key in seen:
+                continue
+            unique_tokens.append(expanded)
+            seen.add(expanded_key)
 
-    return " OR ".join(unique_tokens[:10])
+    return " OR ".join(unique_tokens[:12])
 
 
 def _exec_sql(session: Any, sql: str, params: dict[str, Any] | None = None) -> list[Any]:

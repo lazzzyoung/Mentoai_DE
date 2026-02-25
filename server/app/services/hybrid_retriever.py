@@ -13,6 +13,65 @@ CAREER_RANGE_PATTERN = re.compile(r"(\d{1,2})\s*[-~]\s*(\d{1,2})\s*년")
 CAREER_MIN_PATTERN = re.compile(r"(\d{1,2})\s*년\s*이상")
 CAREER_PLUS_PATTERN = re.compile(r"(\d{1,2})\s*\+\s*년")
 CAREER_MAX_PATTERN = re.compile(r"(\d{1,2})\s*년\s*이하")
+SKILL_SPLIT_PATTERN = re.compile(r"[,/|;]+")
+ROLE_TEXT_SPLIT_PATTERN = re.compile(r"[-_/]+")
+ROLE_FILTER_MIN_SCORE = 0.35
+
+ROLE_ALIASES: dict[str, tuple[str, ...]] = {
+    "backend": (
+        "backend",
+        "back end",
+        "백엔드",
+        "서버 개발",
+        "서버개발",
+        "server developer",
+        "server engineer",
+        "api engineer",
+    ),
+    "frontend": (
+        "frontend",
+        "front end",
+        "프론트엔드",
+        "front",
+        "웹 프론트",
+    ),
+    "data": (
+        "data engineer",
+        "데이터 엔지니어",
+        "analytics engineer",
+        "데이터 파이프라인",
+        "etl",
+        "data platform",
+    ),
+    "ai": (
+        "ai engineer",
+        "ml engineer",
+        "machine learning",
+        "인공지능",
+        "머신러닝",
+        "딥러닝",
+    ),
+    "design": (
+        "designer",
+        "디자이너",
+        "ux",
+        "ui",
+        "product designer",
+    ),
+    "pm": (
+        "product manager",
+        "project manager",
+        "product owner",
+        "서비스 기획",
+        "기획자",
+    ),
+    "marketing": (
+        "marketer",
+        "marketing",
+        "마케터",
+        "브랜드 마케팅",
+    ),
+}
 
 
 @dataclass(slots=True)
@@ -31,6 +90,45 @@ def _clamp01(value: float) -> float:
 
 def _tokenize(text: str) -> list[str]:
     return [token.lower() for token in TOKEN_PATTERN.findall(text or "") if token]
+
+
+def _normalize_role_text(text: str) -> str:
+    lowered = (text or "").lower()
+    lowered = ROLE_TEXT_SPLIT_PATTERN.sub(" ", lowered)
+    return " ".join(lowered.split())
+
+
+def _contains_alias(normalized_text: str, normalized_tokens: set[str], alias: str) -> bool:
+    target = _normalize_role_text(alias)
+    if not target:
+        return False
+    if len(target) <= 2 and target.isalpha():
+        return target in normalized_tokens
+    return target in normalized_text
+
+
+def _extract_role_categories(text: str) -> set[str]:
+    normalized_text = _normalize_role_text(text)
+    if not normalized_text:
+        return set()
+
+    tokens = set(_tokenize(normalized_text))
+    roles: set[str] = set()
+    for role, aliases in ROLE_ALIASES.items():
+        if any(_contains_alias(normalized_text, tokens, alias) for alias in aliases):
+            roles.add(role)
+    return roles
+
+
+def _canonicalize_desired_role(desired_job: str) -> str | None:
+    roles = _extract_role_categories(desired_job)
+    if not roles:
+        return None
+
+    for preferred in ("backend", "frontend", "data", "ai", "pm", "design", "marketing"):
+        if preferred in roles:
+            return preferred
+    return next(iter(roles))
 
 
 def _token_overlap_ratio(query_tokens: list[str], target_tokens: list[str]) -> float:
@@ -120,17 +218,22 @@ def _extract_required_career_bounds(text: str) -> tuple[int | None, int | None]:
 
 
 def _role_match_score(desired_job: str, candidate: job_repository.JobCandidate) -> float:
-    desired = (desired_job or "").strip().lower()
+    desired = _normalize_role_text(desired_job)
     if not desired:
         return 0.5
 
-    title = (candidate.title or "").lower()
-    content = (candidate.content or "").lower()
+    desired_role = _canonicalize_desired_role(desired)
+    candidate_roles = _extract_role_categories(candidate.title)
+    if desired_role:
+        if desired_role in candidate_roles:
+            return 1.0
+        if candidate_roles:
+            return 0.05
 
+    title = _normalize_role_text(candidate.title)
+    content = _normalize_role_text(candidate.content[:500])
     if desired in title:
         return 1.0
-    if desired in content:
-        return 0.9
 
     desired_tokens = _tokenize(desired)
     title_tokens = _tokenize(title)
@@ -138,16 +241,62 @@ def _role_match_score(desired_job: str, candidate: job_repository.JobCandidate) 
 
     title_overlap = _token_overlap_ratio(desired_tokens, title_tokens)
     content_overlap = _token_overlap_ratio(desired_tokens, content_tokens)
-    return _clamp01(max(title_overlap, content_overlap * 0.9))
+    return _clamp01(max(title_overlap, content_overlap * 0.6))
+
+
+def _normalize_user_skill_tokens(user_skills: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in user_skills:
+        if not raw:
+            continue
+        for chunk in SKILL_SPLIT_PATTERN.split(str(raw)):
+            token = " ".join(chunk.strip().lower().split())
+            token = token.strip("()[]{}")
+            if not token or token == "없음":
+                continue
+
+            compact = re.sub(r"[^a-z0-9가-힣+#.]", "", token)
+            if len(compact) < 2 and compact not in {"c", "r", "go"}:
+                continue
+
+            if token in seen:
+                continue
+            seen.add(token)
+            normalized.append(token)
+    return normalized
+
+
+def _skill_in_text(skill: str, target_text: str, target_tokens: set[str], target_compact: str) -> bool:
+    normalized = " ".join(skill.lower().split())
+    if not normalized:
+        return False
+
+    if len(normalized) <= 2 and normalized.isalpha():
+        return normalized in target_tokens
+
+    compact = normalized.replace(" ", "").replace("-", "").replace(".", "")
+    if normalized in target_text:
+        return True
+    if normalized in target_tokens:
+        return True
+    return bool(compact and compact in target_compact)
 
 
 def _skills_match_score(user_skills: list[str], candidate: job_repository.JobCandidate) -> float:
-    normalized_skills = [skill.strip().lower() for skill in user_skills if skill and skill.strip()]
+    normalized_skills = _normalize_user_skill_tokens(user_skills)
     if not normalized_skills:
         return 0.5
 
-    target_text = f"{candidate.skills_text} {candidate.content}".lower()
-    matched = sum(1 for skill in normalized_skills if skill in target_text)
+    target_text = _normalize_role_text(f"{candidate.skills_text} {candidate.content}")
+    target_tokens = set(_tokenize(target_text))
+    target_compact = target_text.replace(" ", "").replace("-", "").replace(".", "")
+
+    matched = sum(
+        1
+        for skill in normalized_skills
+        if _skill_in_text(skill, target_text, target_tokens, target_compact)
+    )
     return _clamp01(matched / len(normalized_skills))
 
 
@@ -197,6 +346,9 @@ def _build_reason(
     skills_score: float | None = None,
     career_score: float | None = None,
 ) -> str:
+    if role_score is not None and role_score < 0.25:
+        return "희망 직무와 공고 직무가 달라 적합도가 낮습니다."
+
     if semantic_score >= 0.7 and (
         role_score is None or skills_score is None or career_score is None
     ):
@@ -243,6 +395,8 @@ async def retrieve_jobs(
 
     bm25_scores = _normalize_bm25(candidates)
     ranked: list[RankedJob] = []
+    role_filtered_ranked: list[RankedJob] = []
+    desired_role = _canonicalize_desired_role(desired_job)
 
     for candidate in candidates:
         semantic = _cosine_similarity(query_vector, embeddings.get(candidate.job_id, []))
@@ -258,22 +412,24 @@ async def retrieve_jobs(
         )
         final_score = _blend_final_score(retrieval_score, profile_score)
 
-        ranked.append(
-            RankedJob(
-                job_id=candidate.job_id,
-                company=candidate.company,
-                title=candidate.title,
-                content=candidate.content,
-                score=final_score,
-                reason=_build_reason(
-                    candidate,
-                    semantic_norm,
-                    role_score=role_score,
-                    skills_score=skills_score,
-                    career_score=career_score,
-                ),
-            )
+        ranked_job = RankedJob(
+            job_id=candidate.job_id,
+            company=candidate.company,
+            title=candidate.title,
+            content=candidate.content,
+            score=final_score,
+            reason=_build_reason(
+                candidate,
+                semantic_norm,
+                role_score=role_score,
+                skills_score=skills_score,
+                career_score=career_score,
+            ),
         )
+        ranked.append(ranked_job)
+        if desired_role is None or role_score >= ROLE_FILTER_MIN_SCORE:
+            role_filtered_ranked.append(ranked_job)
 
-    ranked.sort(key=lambda item: item.score, reverse=True)
-    return ranked[:limit]
+    result_pool = role_filtered_ranked if role_filtered_ranked else ranked
+    result_pool.sort(key=lambda item: item.score, reverse=True)
+    return result_pool[:limit]
