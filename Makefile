@@ -3,7 +3,7 @@ BINARY := bin/mentoai
 .PHONY: build run test lint fmt check tidy clean migrate seed pipeline up down logs
 
 build:
-	go build -ldflags "-s -w" -o $(BINARY) ./cmd/mentoai
+	go build -trimpath -ldflags "-s -w" -o $(BINARY) ./cmd/mentoai
 
 run: build
 	$(BINARY) serve

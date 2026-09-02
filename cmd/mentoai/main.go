@@ -154,6 +154,12 @@ func cmdServe(args []string) error {
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", *host, *port),
 		Handler: app.Server.Handler(),
+		// 타임아웃: 느린 클라이언트(slowloris)·죽은 연결이 고루틴과 메모리를
+		// 누수시키지 않게 한다. 내부 프록시(Caddy) 뒤에서도 무해한 값.
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	go func() {
 		slog.Info("MentoAI 서버 시작", "addr", srv.Addr)

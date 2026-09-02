@@ -163,12 +163,12 @@ func (c *Client) GenerateAnalysis(ctx context.Context, prompt string) (domain.De
 		return out, fmt.Errorf("gemini 생성 API 오류 (status=%d): %s", resp.StatusCode, msg)
 	}
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
-		return out, fmt.Errorf("Gemini 응답 파싱 실패: 빈 후보 %q", string(data))
+		return out, fmt.Errorf("gemini 응답 파싱 실패: 빈 후보 %q", string(data))
 	}
 
 	text := parsed.Candidates[0].Content.Parts[0].Text
 	if err := json.Unmarshal([]byte(text), &out); err != nil {
-		return out, fmt.Errorf("Gemini 응답 파싱 실패: %q", truncate(text, 200))
+		return out, fmt.Errorf("gemini 응답 파싱 실패: %q", truncate(text, 200))
 	}
 	return out, nil
 }

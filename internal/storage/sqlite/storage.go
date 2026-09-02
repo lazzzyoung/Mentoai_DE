@@ -37,8 +37,10 @@ func Open(path string) (*Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sqlite open 실패: %w", err)
 	}
-	// 동시 쓰기 직렬화: busy_timeout과 WAL로 충분하다.
+	// 동시 쓰기 직렬화: busy_timeout과 WAL로 충분하다. 유휴 연결도 최대치로
+	// 유지해 부하 시 연결 재생성(prepare 캐시 재구축) 비용을 피한다.
 	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
 	if err := ping(db); err != nil {
 		db.Close()
 		return nil, err
@@ -60,8 +62,13 @@ func dsnFor(path string) string {
 	if strings.Contains(path, ":memory:") || strings.Contains(path, "file:") {
 		return path
 	}
-	// _pragma 옵션은 modernc.org/sqlite 전용 DSN 파라미터다.
-	return path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	// _pragma/_txlock 옵션은 modernc.org/sqlite 전용 DSN 파라미터다.
+	// - journal_mode(WAL) + synchronous(NORMAL): SQLite 권장 조합 — WAL에서
+	//   NORMAL은 커밋마다 fsync를 건너뛰어 쓰기가 크게 빨라지고, WAL 덕에 내구성 손실은 최소.
+	// - txlock(immediate): 트랜잭션이 첫 쓰기가 아니라 BEGIN에서 쓰기 잠금을 잡아
+	//   동시 쓰기 시 deferred→write 잠금 승격으로 생기는 SQLITE_BUSY를 예방한다.
+	return path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)" +
+		"&_pragma=synchronous(NORMAL)&_txlock=immediate"
 }
 
 func ping(db *sql.DB) error {
@@ -173,6 +180,3 @@ func Now() string { return time.Now().UTC().Format(timeLayout) }
 
 // fmtTime은 time.Time을 저장용 문자열로 바꾼다.
 func fmtTime(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-// parseTime은 저장된 문자열을 time.Time으로 복원한다.
-func parseTime(s string) (time.Time, error) { return time.Parse(timeLayout, s) }

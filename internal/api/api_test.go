@@ -54,7 +54,6 @@ type fakeAdmin struct {
 	created      domain.UserResponse
 	switchOK     bool
 	updateErr    error
-	updated      domain.UserResponse
 	deleteErr    error
 	models       domain.EmbeddingModels
 	resolveErr   error
