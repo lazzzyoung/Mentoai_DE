@@ -38,12 +38,20 @@ pipeline: build
 
 # --- Docker / 배포 ---
 
-# 원터치 배포: api(마이그레이션+시드 자동) + caddy(HTTPS·HTTP/3 자동)가 함께 뜬다.
-# 실제 도메인으로 배포하려면 .env에 CADDY_DOMAIN=도메인 을 넣고 80/443(tcp+udp)을 연다.
+# 원터치 배포: 의존성 확인/설치 → .env 준비 → 빌드·기동 → 헬스체크 (우분투 기준 검증)
+deploy:
+	bash scripts/deploy.sh
+
+# 우분투 최초 설정: Docker Engine + Compose 설치 (sudo 필요)
+ubuntu-setup:
+	sudo bash scripts/setup-ubuntu.sh
+
+# + 로컬 테스트/CLI용 Go 툴체인까지 설치
+ubuntu-setup-go:
+	sudo bash scripts/setup-ubuntu.sh --with-go
+
 up:
 	docker compose up -d --build
-
-deploy: up
 
 down:
 	docker compose down

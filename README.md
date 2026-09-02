@@ -55,8 +55,21 @@ go run ./cmd/mentoai serve    # http://localhost:8000 (관리자: /admin)
 
 ## 📦 배포 (원터치, Caddy 자동 HTTPS + HTTP/3)
 
+### 우분투 서버 — 진짜 한 방
+
 ```bash
-make up        # 이게 전부다: api 빌드+기동(마이그레이션·시드 자동) + caddy(HTTPS 자동)
+sudo bash scripts/setup-ubuntu.sh        # Docker Engine·Compose 설치 (최초 1회, --with-go로 Go도 설치)
+bash scripts/deploy.sh                   # .env 준비 → 빌드 → 기동 → 헬스체크까지 자동
+```
+
+- `deploy.sh`는 Docker가 없으면 자동 설치하고, `.env`가 없으면 예시에서 생성(AUTH_SECRET 자동 발급), ufw가 켜져 있으면 80/443(tcp)·443(udp) 포트를 열고, 443 헬스체크가 지날 때까지 기다린 뒤 결과를 출력한다.
+- 도메인 배포: `.env`의 `CADDY_DOMAIN=도메인`을 채우고 DNS를 서버로 맞춘 뒤 `deploy.sh`를 다시 실행하면 Let's Encrypt 인증서가 자동 발급된다.
+- 값을 바꾼 뒤에는 `docker compose up -d`로 env를 재적용한다.
+
+### 로컬(Docker Desktop 등)
+
+```bash
+make up        # api 빌드+기동(마이그레이션·시드 자동) + caddy(HTTPS 자동)
 ```
 
 - `CADDY_DOMAIN=localhost`(기본)이면 **내부 CA 자체서명 인증서**로 HTTPS 구동 — `curl -k` 또는 브라우저 경고 진행으로 확인.
