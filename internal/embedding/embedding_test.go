@@ -8,6 +8,7 @@ import (
 )
 
 func TestPrefixes(t *testing.T) {
+	t.Parallel()
 	if q, d := Prefixes("intfloat/multilingual-e5-large"); q != "query: " || d != "passage: " {
 		t.Fatalf("e5 접두어: %q %q", q, d)
 	}
@@ -28,6 +29,7 @@ func (f fakeEmbedder) ModelKey() string { return f.key }
 func (f fakeEmbedder) Dim() int         { return 1024 }
 
 func TestRegistryResolve(t *testing.T) {
+	t.Parallel()
 	reg := NewRegistry()
 	reg.Register("gemini", "gemini-embedding-001", 1024,
 		func(config.Settings) (Embedder, error) { return fakeEmbedder{"gemini:gemini-embedding-001"}, nil })
@@ -59,6 +61,7 @@ func TestRegistryResolve(t *testing.T) {
 }
 
 func TestRegistryBuild(t *testing.T) {
+	t.Parallel()
 	reg := NewRegistry()
 	reg.Register("gemini", "m", 1024,
 		func(config.Settings) (Embedder, error) { return fakeEmbedder{"gemini:m"}, nil })
@@ -75,6 +78,7 @@ func TestRegistryBuild(t *testing.T) {
 }
 
 func TestAtomicEmbedderSwap(t *testing.T) {
+	t.Parallel()
 	active := NewAtomic(fakeEmbedder{"a"})
 	if active.Current().ModelKey() != "a" {
 		t.Fatal("초기값")

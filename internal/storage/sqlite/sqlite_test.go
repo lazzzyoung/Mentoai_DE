@@ -16,7 +16,7 @@ func newTestStore(t *testing.T) *Storage {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	if _, err := store.ApplyMigrations(context.Background()); err != nil {
+	if _, err := store.ApplyMigrations(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return store
@@ -32,8 +32,9 @@ func seedUser(t *testing.T, store *Storage, username string) int64 {
 }
 
 func TestUserCRUD(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	id := seedUser(t, store, "지원")
 	if err := store.Users.UpsertSpec(ctx, id, "데이터 엔지니어", 2, []string{"Python", "SQL"}); err != nil {
@@ -79,8 +80,9 @@ func TestUserCRUD(t *testing.T) {
 }
 
 func TestJobUpsertAndPendingAndSearch(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	from := 2
 	now := time.Now()
@@ -155,8 +157,9 @@ func TestJobUpsertAndPendingAndSearch(t *testing.T) {
 }
 
 func TestDeleteAllAndInvalidate(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rows := []domain.SilverRow{{Source: "s", SourceID: "1", DueTime: "상시채용", FullText: "x"}}
 	if err := store.Jobs.UpsertJobs(ctx, rows, time.Now()); err != nil {
@@ -181,8 +184,9 @@ func TestDeleteAllAndInvalidate(t *testing.T) {
 }
 
 func TestAnalysisCache(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	userID := seedUser(t, store, "테스터")
 	rows := []domain.SilverRow{{Source: "s", SourceID: "1", Company: strptr("C"), DueTime: "d", FullText: "x"}}
@@ -213,8 +217,9 @@ func TestAnalysisCache(t *testing.T) {
 }
 
 func TestPipelineRuns(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	running, err := store.Runs.HasRunning(ctx)
 	if err != nil || running {
@@ -247,8 +252,9 @@ func TestPipelineRuns(t *testing.T) {
 }
 
 func TestListJobsQueryFilter(t *testing.T) {
+	t.Parallel()
 	store := newTestStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rows := []domain.SilverRow{
 		{Source: "s", SourceID: "1", Company: strptr("멘토AI"), Position: strptr("엔지니어"), DueTime: "d"},

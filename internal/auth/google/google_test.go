@@ -1,7 +1,6 @@
 package google
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,6 +35,7 @@ func fakeGoogle(t *testing.T, tokenStatus int, tokenBody, userinfoBody string) (
 }
 
 func TestEnabledAndLoginURL(t *testing.T) {
+	t.Parallel()
 	p, _ := fakeGoogle(t, 200, `{"access_token":"t"}`, `{}`)
 	if !p.Enabled() {
 		t.Fatal("client id/secret이 있으면 활성")
@@ -49,11 +49,12 @@ func TestEnabledAndLoginURL(t *testing.T) {
 }
 
 func TestExchange(t *testing.T) {
+	t.Parallel()
 	p, captured := fakeGoogle(t, 200,
 		`{"access_token":"tok-1"}`,
 		`{"sub":"sub-77","email":"dev@example.com","name":"개발자"}`)
 
-	identity, err := p.Exchange(context.Background(), "the-code", "")
+	identity, err := p.Exchange(t.Context(), "the-code", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +73,9 @@ func TestExchange(t *testing.T) {
 }
 
 func TestExchangeRejectsTokenError(t *testing.T) {
+	t.Parallel()
 	p, _ := fakeGoogle(t, 400, `{"error":"invalid_grant"}`, `{}`)
-	if _, err := p.Exchange(context.Background(), "bad", ""); err == nil ||
+	if _, err := p.Exchange(t.Context(), "bad", ""); err == nil ||
 		!strings.Contains(err.Error(), "invalid_grant") {
 		t.Fatalf("토큰 교환 거부: %v", err)
 	}

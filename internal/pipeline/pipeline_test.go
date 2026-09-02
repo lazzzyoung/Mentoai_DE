@@ -53,8 +53,9 @@ func bronzeRecords() []domain.RawRecord {
 }
 
 func TestBronzeIsolatesScraperFailure(t *testing.T) {
+	t.Parallel()
 	store := testStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	deps := Deps{Raw: store.Raw, Scrapers: []Scraper{failScraper(), okScraper(bronzeRecords())}}
 
 	count, err := Bronze(ctx, deps)
@@ -67,8 +68,9 @@ func TestBronzeIsolatesScraperFailure(t *testing.T) {
 }
 
 func TestSilverNormalizesAndStores(t *testing.T) {
+	t.Parallel()
 	store := testStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	deps := Deps{Raw: store.Raw, Jobs: store.Jobs, Scrapers: []Scraper{okScraper(bronzeRecords())}}
 
 	if _, err := Bronze(ctx, deps); err != nil {
@@ -88,8 +90,9 @@ func TestSilverNormalizesAndStores(t *testing.T) {
 }
 
 func TestGoldDimensionMismatch(t *testing.T) {
+	t.Parallel()
 	store := testStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	deps := Deps{
 		Raw: store.Raw, Jobs: store.Jobs, Embeds: store.Embeddings,
 		Embedder: fakeActive{&fakeEmbedder{dim: 8}},
@@ -109,8 +112,9 @@ func TestGoldDimensionMismatch(t *testing.T) {
 }
 
 func TestRunPipelineEndToEnd(t *testing.T) {
+	t.Parallel()
 	store := testStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	deps := Deps{
 		Raw: store.Raw, Jobs: store.Jobs, Embeds: store.Embeddings, Runs: store.Runs,
 		Embedder: fakeActive{&fakeEmbedder{dim: 4}},
@@ -143,8 +147,9 @@ func TestRunPipelineEndToEnd(t *testing.T) {
 }
 
 func TestRunPipelineFailureRecorded(t *testing.T) {
+	t.Parallel()
 	store := testStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	deps := Deps{
 		Raw: store.Raw, Jobs: store.Jobs, Embeds: store.Embeddings, Runs: store.Runs,
 		Embedder: fakeActive{&fakeEmbedder{dim: 4}},
@@ -172,7 +177,7 @@ func testStore(t *testing.T) *sqlite.Storage {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	if _, err := store.ApplyMigrations(context.Background()); err != nil {
+	if _, err := store.ApplyMigrations(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return store

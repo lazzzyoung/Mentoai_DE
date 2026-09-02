@@ -3,6 +3,7 @@ package scoring
 import "testing"
 
 func TestSimilarityToScore(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		similarity float64
 		want       int
@@ -20,6 +21,7 @@ func TestSimilarityToScore(t *testing.T) {
 }
 
 func TestSkillOverlap(t *testing.T) {
+	t.Parallel()
 	got := SkillOverlap(
 		[]string{"python", " SQL ", "Java"},
 		[]string{"Python", "sql", "Docker", ""},
@@ -30,6 +32,7 @@ func TestSkillOverlap(t *testing.T) {
 }
 
 func TestBuildReason(t *testing.T) {
+	t.Parallel()
 	annual := 5
 	newbie := true
 	got := BuildReason([]string{"Python"}, 2, []string{"Python", "SQL"}, &annual, nil)
@@ -46,6 +49,7 @@ func TestBuildReason(t *testing.T) {
 }
 
 func TestCareerLabel(t *testing.T) {
+	t.Parallel()
 	from, to := 3, 7
 	if got := CareerLabel(&from, &to, nil); got == nil || *got != "경력 3~7년" {
 		t.Fatalf("got=%v", got)

@@ -9,6 +9,7 @@ import (
 )
 
 func TestAuthStatus(t *testing.T) {
+	t.Parallel()
 	auth := &fakeAuth{status: domain.AuthStatus{Providers: []domain.ProviderStatus{
 		{Provider: "google", Enabled: true, LoginPath: "/api/v1/auth/google/login"},
 		{Provider: "toss", Enabled: false},
@@ -24,6 +25,7 @@ func TestAuthStatus(t *testing.T) {
 }
 
 func TestAuthLoginRedirect(t *testing.T) {
+	t.Parallel()
 	auth := &fakeAuth{loginURL: "https://accounts.google.com/o/oauth2/v2/auth?state=abc", loginURLok: true}
 	ts := newTestServerAuth(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{}, auth, false)
 	defer ts.Close()
@@ -49,6 +51,7 @@ func TestAuthLoginRedirect(t *testing.T) {
 }
 
 func TestAuthCallback(t *testing.T) {
+	t.Parallel()
 	auth := &fakeAuth{token: "tok", user: domain.UserResponse{ID: 7, Username: "user"}}
 	ts := newTestServerAuth(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{}, auth, false)
 	defer ts.Close()
@@ -69,6 +72,7 @@ func TestAuthCallback(t *testing.T) {
 }
 
 func TestAuthTossCallback(t *testing.T) {
+	t.Parallel()
 	auth := &fakeAuth{token: "toss-token", user: domain.UserResponse{ID: 9, Username: "토스사용자"}}
 	ts := newTestServerAuth(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{}, auth, false)
 	defer ts.Close()
@@ -87,6 +91,7 @@ func TestAuthTossCallback(t *testing.T) {
 }
 
 func TestAuthMeAndLogout(t *testing.T) {
+	t.Parallel()
 	auth := &fakeAuth{authenticated: true, meUser: domain.UserResponse{
 		ID: 42, Username: "로그인유저", DesiredJob: "백엔드", CareerYears: 3, Skills: []string{},
 	}}
@@ -126,6 +131,7 @@ func TestAuthMeAndLogout(t *testing.T) {
 }
 
 func TestAuthRequiredGate(t *testing.T) {
+	t.Parallel()
 	ts := newTestServerAuth(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{}, &fakeAuth{}, true)
 	defer ts.Close()
 

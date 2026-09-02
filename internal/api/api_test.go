@@ -200,6 +200,7 @@ func do(t *testing.T, method, url string, body string) (*http.Response, string) 
 // ---------- 정적 셸 ----------
 
 func TestHealth(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{})
 	defer ts.Close()
 
@@ -210,6 +211,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestStaticShell(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{})
 	defer ts.Close()
 
@@ -260,6 +262,7 @@ func TestStaticShell(t *testing.T) {
 // ---------- v1 ----------
 
 func TestListUsers(t *testing.T) {
+	t.Parallel()
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, &fakeAdmin{})
 	defer ts.Close()
 
@@ -275,6 +278,7 @@ func TestListUsers(t *testing.T) {
 }
 
 func TestRecommendJobs(t *testing.T) {
+	t.Parallel()
 	rec := &fakeRecommender{result: domain.RecommendationListResponse{
 		UserName: "지원",
 		Recommendations: []domain.JobSummary{{
@@ -310,6 +314,7 @@ func TestRecommendJobs(t *testing.T) {
 }
 
 func TestAnalyzeJob(t *testing.T) {
+	t.Parallel()
 	ana := &fakeAnalyzer{result: domain.DetailedAnalysisResponse{JobTitle: "엔지니어", CurrentScore: 72, MaxScore: 100}}
 	ts := newTestServer(&fakeRecommender{}, ana, &fakeAdmin{})
 	defer ts.Close()
@@ -329,6 +334,7 @@ func TestAnalyzeJob(t *testing.T) {
 // ---------- admin ----------
 
 func TestAdminStatsAndRuns(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{status: domain.Status{Bronze: 10, Jobs: 8, Embeddings: 8, Users: 3,
 		CachedAnalyses: 1, EmbeddingModel: "gemini:gemini-embedding-001", EmbeddingDim: 1024,
 		Sizes: domain.Sizes{BronzeSize: "1 kB", JobsSize: "2 kB", EmbeddingsSize: "3 kB"}}}
@@ -350,6 +356,7 @@ func TestAdminStatsAndRuns(t *testing.T) {
 }
 
 func TestAdminTriggerPipeline(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{}
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, admin)
 	defer ts.Close()
@@ -367,6 +374,7 @@ func TestAdminTriggerPipeline(t *testing.T) {
 }
 
 func TestAdminJobsList(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{jobs: []domain.JobAdminRow{{ID: 1, Source: "wanted", SourceID: "1"}}}
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, admin)
 	defer ts.Close()
@@ -381,6 +389,7 @@ func TestAdminJobsList(t *testing.T) {
 }
 
 func TestAdminDeleteJob(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{}
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, admin)
 	defer ts.Close()
@@ -396,6 +405,7 @@ func TestAdminDeleteJob(t *testing.T) {
 }
 
 func TestAdminUserCRUD(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{}
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, admin)
 	defer ts.Close()
@@ -442,6 +452,7 @@ func TestAdminUserCRUD(t *testing.T) {
 }
 
 func TestAdminEmbeddingEndpoints(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{models: domain.EmbeddingModels{
 		Current: "gemini:gemini-embedding-001", Provider: "gemini", Dim: 1024,
 		Available:     []domain.ModelInfo{{Provider: "gemini", Model: "gemini-embedding-001", Dim: 1024}},
@@ -488,6 +499,7 @@ func TestAdminEmbeddingEndpoints(t *testing.T) {
 }
 
 func TestAdminCache(t *testing.T) {
+	t.Parallel()
 	admin := &fakeAdmin{deletedCount: 2}
 	admin.cacheRows = []domain.CacheRow{{JobID: 1, UserID: 1, Model: "m", Username: "지원"}}
 	ts := newTestServer(&fakeRecommender{}, &fakeAnalyzer{}, admin)

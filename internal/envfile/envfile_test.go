@@ -7,6 +7,7 @@ import (
 )
 
 func TestUpdateReplacesInPlaceAndPreservesComments(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), ".env")
 	original := "# 주석\nEMBEDDING_PROVIDER=fastembed\nSCHEDULE_ENABLED=false\nEMBEDDING_DIM=1024\n"
 	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
@@ -33,6 +34,7 @@ func TestUpdateReplacesInPlaceAndPreservesComments(t *testing.T) {
 }
 
 func TestUpdateAppendsMissingKeys(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(path, []byte("A=1\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -48,6 +50,7 @@ func TestUpdateAppendsMissingKeys(t *testing.T) {
 }
 
 func TestUpdateCreatesMissingFileWithoutBackup(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), ".env")
 	backup, err := Update(path, map[string]string{"K": "V"})
 	if err != nil {
@@ -63,6 +66,7 @@ func TestUpdateCreatesMissingFileWithoutBackup(t *testing.T) {
 }
 
 func TestHasKeyIgnoresComments(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), ".env")
 	_ = os.WriteFile(path, []byte("# GOOGLE_API_KEY=commented\nGOOGLE_API_KEY=real\n"), 0o644)
 	if !HasKey(path, "GOOGLE_API_KEY") {

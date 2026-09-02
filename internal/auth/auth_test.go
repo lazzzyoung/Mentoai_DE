@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/Chae-JS/mentoai/internal/domain"
@@ -15,6 +16,7 @@ import (
 // ---------- 세션 매니저 ----------
 
 func TestSessionIssueVerify(t *testing.T) {
+	t.Parallel()
 	m := NewSessionManager("secret-key", time.Hour, false)
 	token, err := m.Issue(7, "지원")
 	if err != nil {
@@ -30,6 +32,7 @@ func TestSessionIssueVerify(t *testing.T) {
 }
 
 func TestSessionRejectsTamperAndExpiry(t *testing.T) {
+	t.Parallel()
 	m := NewSessionManager("secret-key", time.Hour, false)
 	token, _ := m.Issue(1, "u")
 
@@ -53,7 +56,43 @@ func TestSessionRejectsTamperAndExpiry(t *testing.T) {
 	}
 }
 
+// TestSessionExpiryVirtualTime은 testing/synctest(Go 1.25+)의 가상 시간으로
+// 만료를 검증한다. 버블 안의 time.Sleep은 실제로 기다리지 않고 즉시 흐른다 —
+// 실제 시간에 의존하지 않아 항상 결정적이고 0초 만에 끝난다.
+func TestSessionExpiryVirtualTime(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		m := NewSessionManager("secret-key", 2*time.Hour, false)
+		token, err := m.Issue(1, "u")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := m.Verify(token); err != nil {
+			t.Fatalf("발급 직후는 유효해야 한다: %v", err)
+		}
+
+		time.Sleep(3 * time.Hour) // 버블 안에서 가상 시간이 즉시 흐른다
+
+		if _, err := m.Verify(token); err == nil {
+			t.Fatal("가상 시간 3시간 후에는 만료되어야 한다")
+		}
+	})
+}
+
+// FuzzSessionVerify는 임의 입력 토큰이 패닉 없이 안전하게 처리되는지 탐색한다.
+// `go test -fuzz=FuzzSessionVerify -fuzztime=30s`로 심화 실행, 평소엔 시드만 돈다.
+func FuzzSessionVerify(f *testing.F) {
+	f.Add("abc.def")
+	f.Add("")
+	f.Add("eyJ1aWQiOjF9.sig")
+	f.Fuzz(func(t *testing.T, token string) {
+		m := NewSessionManager("fuzz-key", time.Hour, false)
+		_, _ = m.Verify(token)
+	})
+}
+
 func TestSessionFromRequestCookieAndBearer(t *testing.T) {
+	t.Parallel()
 	m := NewSessionManager("k", time.Hour, false)
 	token, _ := m.Issue(5, "베어러")
 
@@ -103,7 +142,7 @@ func newAuthService(t *testing.T) (*Service, *sqlite.Storage) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	if _, err := store.ApplyMigrations(context.Background()); err != nil {
+	if _, err := store.ApplyMigrations(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	sessions := NewSessionManager("test-secret", time.Hour, false)
@@ -117,8 +156,9 @@ func newAuthService(t *testing.T) (*Service, *sqlite.Storage) {
 }
 
 func TestLoginCreatesUserAndLinks(t *testing.T) {
+	t.Parallel()
 	svc, store := newAuthService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	token, user, err := svc.Login(ctx, "google", "code", "")
 	if err != nil {
@@ -148,8 +188,9 @@ func TestLoginCreatesUserAndLinks(t *testing.T) {
 }
 
 func TestLoginUsernameConflictGetsSuffix(t *testing.T) {
+	t.Parallel()
 	svc, store := newAuthService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// 미리 "user"라는 이름의 사용자를 만들어 둔다
 	if _, err := store.Users.Insert(ctx, "user"); err != nil {
@@ -165,8 +206,9 @@ func TestLoginUsernameConflictGetsSuffix(t *testing.T) {
 }
 
 func TestLoginTossUsesUserKey(t *testing.T) {
+	t.Parallel()
 	svc, _ := newAuthService(t)
-	_, user, err := svc.Login(context.Background(), "toss", "code", "DEFAULT")
+	_, user, err := svc.Login(t.Context(), "toss", "code", "DEFAULT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,16 +218,18 @@ func TestLoginTossUsesUserKey(t *testing.T) {
 }
 
 func TestLoginDisabledProviderRejected(t *testing.T) {
+	t.Parallel()
 	svc, _ := newAuthService(t)
-	_, _, err := svc.Login(context.Background(), "unknown", "code", "")
+	_, _, err := svc.Login(t.Context(), "unknown", "code", "")
 	if err == nil || !strings.Contains(err.Error(), "사용할 수 없는 로그인 공급자") {
 		t.Fatalf("미등록/비활성 공급자 거부: %v", err)
 	}
 }
 
 func TestMeAndUpdateMe(t *testing.T) {
+	t.Parallel()
 	svc, _ := newAuthService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	token, user, err := svc.Login(ctx, "toss", "code", "")
 	if err != nil {

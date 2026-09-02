@@ -1,7 +1,6 @@
 package toss
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -41,11 +40,12 @@ func fakeToss(t *testing.T, tokenStatus int, tokenBody, meBody string) (*Provide
 }
 
 func TestExchange(t *testing.T) {
+	t.Parallel()
 	p, captured := fakeToss(t, 200,
 		`{"tokenType":"bearer","accessToken":"toss-token","expiresIn":3600}`,
 		`{"userKey":9876543210,"scope":"profile"}`)
 
-	identity, err := p.Exchange(context.Background(), "auth-code-1", "DEFAULT")
+	identity, err := p.Exchange(t.Context(), "auth-code-1", "DEFAULT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,15 +59,17 @@ func TestExchange(t *testing.T) {
 }
 
 func TestExchangeRejectsInvalidGrant(t *testing.T) {
+	t.Parallel()
 	p, _ := fakeToss(t, 200, `{"error":"invalid_grant"}`, `{}`)
 	// access_token이 빈 경우 → 거부
-	_, err := p.Exchange(context.Background(), "expired", "")
+	_, err := p.Exchange(t.Context(), "expired", "")
 	if err == nil || !strings.Contains(err.Error(), "invalid_grant") {
 		t.Fatalf("인가 코드 만료/재사용은 거부: %v", err)
 	}
 }
 
 func TestLoginURLNotSupported(t *testing.T) {
+	t.Parallel()
 	p, _ := fakeToss(t, 200, `{}`, `{}`)
 	if _, ok := p.LoginURL("s"); ok {
 		t.Fatal("토스는 redirect 방식이 아니다 (클라이언트 SDK가 인가 코드 수령)")
@@ -75,6 +77,7 @@ func TestLoginURLNotSupported(t *testing.T) {
 }
 
 func TestNewWithoutCertIsDisabled(t *testing.T) {
+	t.Parallel()
 	p, err := New(Config{})
 	if err != nil {
 		t.Fatal(err)
