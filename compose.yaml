@@ -28,6 +28,7 @@ services:
       - "443:443/udp"  # HTTP/3 (QUIC)
     environment:
       CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+      API_UPSTREAM: api:8000
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data   # 인증서 저장 (갱신간 유지)

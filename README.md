@@ -57,18 +57,29 @@ go run ./cmd/mentoai serve    # http://localhost:8000 (관리자: /admin)
 
 ## 📦 배포 (원터치, Caddy 자동 HTTPS + HTTP/3)
 
-### 우분투 서버 — 진짜 한 방
+### 우분투 서버 — 네이티브(무도커) 배포, 권장
+
+로컬에서 크로스컴파일 → rsync 전송 → systemd 서비스로 기동. **서버에 Docker가 필요 없다.**
 
 ```bash
-sudo bash scripts/setup-ubuntu.sh        # Docker Engine·Compose 설치 (최초 1회, --with-go로 Go도 설치)
-bash scripts/deploy.sh                   # .env 준비 → 빌드 → 기동 → 헬스체크까지 자동
+make deploy-native HOST=root@서버IP ARCH=arm64   # 또는 scripts/deploy-native.sh root@서버IP amd64
 ```
 
-- `deploy.sh`는 Docker가 없으면 자동 설치하고, `.env`가 없으면 예시에서 생성(AUTH_SECRET 자동 발급), ufw가 켜져 있으면 80/443(tcp)·443(udp) 포트를 열고, 443 헬스체크가 지날 때까지 기다린 뒤 결과를 출력한다.
-- 도메인 배포: `.env`의 `CADDY_DOMAIN=도메인`을 채우고 DNS를 서버로 맞춘 뒤 `deploy.sh`를 다시 실행하면 Let's Encrypt 인증서가 자동 발급된다.
-- 값을 바꾼 뒤에는 `docker compose up -d`로 env를 재적용한다.
+스크립트가 전부 한다:
+- `linux/arm64|amd64` 정적 바이너리 크로스컴파일(CGO 0) 후 rsync — 실행 중 교체도 안전한 방식
+- 서버엔 **우분투 저장소 패키지만** 설치: `caddy`(자동 HTTPS·HTTP/3), rsync
+- 전용 시스템 유저 `mentoai` + `/opt/mentoai`(바이너리·.env·data/) + `mentoai.service`(자동 재시작, 경량 샌드박스)
+- `.env`가 없으면 생성(AUTH_SECRET 자동 발급). **있으면 절대 덮지 않는다**
+- 443 헬스체크 통과까지 대기 후 결과 출력
 
-### 로컬(Docker Desktop 등)
+운영 명령:
+```bash
+ssh 서버 sudo journalctl -u mentoai -f        # 앱 로그
+ssh 서버 sudo systemctl restart mentoai       # 재시작
+ssh 서버 'cd /opt/mentoai && sudo ./mentoai status'   # 데이터 현황
+```
+
+### Docker (로컬/컨테이너 환경)
 
 ```bash
 make up        # api 빌드+기동(마이그레이션·시드 자동) + caddy(HTTPS 자동)

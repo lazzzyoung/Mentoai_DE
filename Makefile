@@ -1,6 +1,6 @@
 BINARY := bin/mentoai
 
-.PHONY: build run test lint fmt check tidy clean migrate seed pipeline up down logs
+.PHONY: build run test lint fmt check tidy clean migrate seed pipeline up down logs logs-caddy deploy ubuntu-setup ubuntu-setup-go release deploy-native
 
 build:
 	go build -trimpath -ldflags "-s -w" -o $(BINARY) ./cmd/mentoai
@@ -61,3 +61,16 @@ logs:
 
 logs-caddy:
 	docker compose logs -f caddy
+
+# --- 네이티브(무도커) 배포: 로컬 크로스컴파일 → rsync → systemd ---
+
+# linux 크로스컴파일: ARCH=amd64|arm64 (기본 amd64)
+release:
+	ARCH=$${ARCH:-amd64}; \
+	CGO_ENABLED=0 GOOS=linux GOARCH=$$ARCH go build -trimpath -ldflags "-s -w" -o dist/mentoai-linux-$$ARCH ./cmd/mentoai
+
+# 사용법: make deploy-native HOST=root@서버IP [ARCH=amd64|arm64] [PORT=22]
+deploy-native:
+	@test -n "$(HOST)" || { echo "사용법: make deploy-native HOST=user@host [ARCH=amd64|arm64] [PORT=22]"; exit 1; }
+	test -n "$$ARCH" || ARCH=amd64; test -n "$$PORT" || PORT=22
+	bash scripts/deploy-native.sh "$(HOST)" "$$ARCH" "$$PORT"

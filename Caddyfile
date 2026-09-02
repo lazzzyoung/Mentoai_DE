@@ -23,5 +23,6 @@
 		-Server
 	}
 
-	reverse_proxy api:8000
+	# compose: API_UPSTREAM=api:8000 (서비스명) / 네이티브: 127.0.0.1:8000
+	reverse_proxy {$API_UPSTREAM}
 }
