@@ -174,7 +174,7 @@ func newTestServerAuth(rec *fakeRecommender, ana *fakeAnalyzer, admin *fakeAdmin
 	users := &fakeUsers{users: []domain.UserSummary{
 		{ID: 1, Username: "지원", DesiredJob: "데이터 엔지니어", CareerYears: 2},
 	}}
-	srv := New(users, rec, ana, admin, auth, authRequired)
+	srv := New(users, rec, ana, admin, auth, authRequired, nil)
 	ts := httptest.NewServer(srv.Handler())
 	return ts
 }

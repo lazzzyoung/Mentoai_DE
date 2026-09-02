@@ -50,6 +50,10 @@ type Settings struct {
 	TossMTLSCertPath   string // 앱인토스 mTLS 클라이언트 인증서
 	TossMTLSKeyPath    string
 	TossAPIBaseURL     string
+
+	// --- 텔레메트리 (에러 리포팅) ---
+	SentryDSN         string // 비어 있으면 리포팅 완전 비활성(Noop)
+	SentryEnvironment string // Sentry 환경 태그 (production/staging 등)
 }
 
 // Load는 .env를 환경변수에 반영한 뒤 Settings를 만든다.
@@ -90,6 +94,9 @@ func Load(envFile string) Settings {
 		TossMTLSCertPath:   get("TOSS_MTLS_CERT_PATH", ""),
 		TossMTLSKeyPath:    get("TOSS_MTLS_KEY_PATH", ""),
 		TossAPIBaseURL:     get("TOSS_API_BASE_URL", ""),
+
+		SentryDSN:         get("SENTRY_DSN", ""),
+		SentryEnvironment: get("SENTRY_ENVIRONMENT", "production"),
 	}
 }
 

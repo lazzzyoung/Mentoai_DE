@@ -1,12 +1,22 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Chae-JS/mentoai/internal/domain"
 )
+
+func newTestServerReporter(rec *fakeRecommender, ana *fakeAnalyzer, admin *fakeAdmin, rep *fakeReporter) *httptest.Server {
+	srv := New(&fakeUsers{}, rec, ana, admin, &fakeAuth{}, false, rep)
+	ts := httptest.NewServer(srv.Handler())
+	return ts
+}
 
 func TestAuthStatus(t *testing.T) {
 	t.Parallel()
@@ -145,5 +155,50 @@ func TestAuthRequiredGate(t *testing.T) {
 	// users는 항상 개방
 	if resp, _ := do(t, http.MethodGet, ts.URL+"/api/v1/users", ""); resp.StatusCode != 200 {
 		t.Fatalf("users 개방 기대: %d", resp.StatusCode)
+	}
+}
+
+// fakeReporter는 에러 리포팅 포트의 기록용 가짜다.
+type fakeReporter struct {
+	mu    sync.Mutex
+	calls []reported
+}
+
+type reported struct {
+	err  string
+	tags map[string]string
+}
+
+func (f *fakeReporter) CaptureError(err error, tags map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, reported{err: err.Error(), tags: tags})
+}
+func (f *fakeReporter) Close(timeout time.Duration) {}
+
+func TestErrorReportingOn500(t *testing.T) {
+	t.Parallel()
+	rep := &fakeReporter{}
+	rec := &fakeRecommender{err: errors.New("gemini 키 만료")}
+	ts := newTestServerReporter(rec, &fakeAnalyzer{}, &fakeAdmin{}, rep)
+	defer ts.Close()
+
+	resp, body := do(t, http.MethodPost, ts.URL+"/api/v1/jobs/recommend/1", "")
+	if resp.StatusCode != 500 || !strings.Contains(body, "gemini 키 만료") {
+		t.Fatalf("500 응답: %d %s", resp.StatusCode, body)
+	}
+	if len(rep.calls) != 1 || !strings.Contains(rep.calls[0].err, "gemini 키 만료") {
+		t.Fatalf("리포터 호출: %+v", rep.calls)
+	}
+	if rep.calls[0].tags["method"] != http.MethodPost {
+		t.Fatalf("태그: %+v", rep.calls[0].tags)
+	}
+
+	// 4xx는 리포팅 대상이 아니다
+	rep.calls = nil
+	rec.err = domain.NotFound("User not found")
+	do(t, http.MethodPost, ts.URL+"/api/v1/jobs/recommend/1", "")
+	if len(rep.calls) != 0 {
+		t.Fatalf("4xx는 리포팅되지 않아야 한다: %+v", rep.calls)
 	}
 }

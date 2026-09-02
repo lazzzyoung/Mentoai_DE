@@ -62,23 +62,32 @@ func New(
 	active *embedding.AtomicEmbedder,
 	runner PipelineRunner,
 	schedule ScheduleInfoProvider,
+	reporter ErrorReporter,
 ) *Service {
 	return &Service{
 		cfg: cfg, users: users, raw: raw, jobs: jobs, embeds: embeds,
 		cache: cache, runs: runs, probe: probe, registry: registry,
-		active: active, runner: runner, schedule: schedule, guard: NewGuard(),
+		active: active, runner: runner, schedule: schedule, guard: NewGuard(reporter),
 	}
 }
 
 // ---------- 백그라운드 작업 가드 ----------
 
-// Guard는 이름 기반 단일 실행 가드다. Python의 start_background와 동일한 의미다.
-type Guard struct {
-	mu      sync.Mutex
-	running map[string]struct{}
+// ErrorReporter는 에러 리포팅 포트다 (telemetry.Reporter가 구조적으로 충족).
+type ErrorReporter interface {
+	CaptureError(err error, tags map[string]string)
 }
 
-func NewGuard() *Guard { return &Guard{running: map[string]struct{}{}} }
+// Guard는 이름 기반 단일 실행 가드다. Python의 start_background와 동일한 의미다.
+type Guard struct {
+	mu       sync.Mutex
+	running  map[string]struct{}
+	reporter ErrorReporter
+}
+
+func NewGuard(reporter ErrorReporter) *Guard {
+	return &Guard{running: map[string]struct{}{}, reporter: reporter}
+}
 
 // Start는 동일 이름 작업이 이미 돌면 false를 반환하고, 아니면 고루틴으로 실행한다.
 func (g *Guard) Start(name string, fn func(ctx context.Context) error) bool {
@@ -94,6 +103,10 @@ func (g *Guard) Start(name string, fn func(ctx context.Context) error) bool {
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("백그라운드 작업 패닉", "op", name, "panic", r)
+				if g.reporter != nil {
+					g.reporter.CaptureError(fmt.Errorf("백그라운드 작업 패닉 (%s): %v", name, r),
+						map[string]string{"op": name, "kind": "panic"})
+				}
 			}
 			g.mu.Lock()
 			delete(g.running, name)
@@ -101,6 +114,9 @@ func (g *Guard) Start(name string, fn func(ctx context.Context) error) bool {
 		}()
 		if err := fn(context.Background()); err != nil {
 			slog.Error("백그라운드 작업 실패", "op", name, "error", err)
+			if g.reporter != nil {
+				g.reporter.CaptureError(err, map[string]string{"op": name})
+			}
 		}
 	}()
 	return true

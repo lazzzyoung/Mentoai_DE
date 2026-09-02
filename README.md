@@ -222,6 +222,22 @@ mentoai_de/
 - gold의 재임베딩 판정(신규 / `embedded_at < updated_at` / 모델 불일치)도 동일하다.
 - fastembed(로컬 ONNX)는 Go에 직접 대체재가 없어 미포함. 필요하면 ONNX Runtime 바인딩으로 `Embedder`를 구현해 레지스트리에 등록하면 된다.
 
+## 📈 모니터링 & 에러 알림
+
+서버에 모니터링 스택을 얹지 않고, **무료 클라우드 서비스가 바깥에서 감시**하는 구성(512MB 인스턴스 기준 RAM 영향 ≈ 0):
+
+| 감시 대상 | 도구 | 설정 |
+|---|---|---|
+| 서비스 다운·TLS 만료 | [UptimeRobot](https://uptimerobot.com) 무료 (5분 간격) | `https://도메인/health` 등록만 하면 끝 — 이메일/텔레그램 알림 |
+| 앱 내부 에러·패닉·파이프라인 실패 | **Sentry** (내장, [`sentry-go`](https://github.com/getsentry/sentry-go)) | `.env`에 `SENTRY_DSN` 입력 → 활성화. 미설정 시 Noop(완전 off) |
+| CPU·인스턴스 상태 | Lightsail 콘솔 메트릭 + CloudWatch 알람 | 콘솔에서 알람 생성 → SNS 이메일 |
+
+Sentry 연동 지점(코드에 내장): HTTP 5xx 오류(4xx 제외), 핸들러 패닉(500 응답으로 변환 후 리포트), 파이프라인 단계 실패(`stage` 태그: bronze/silver/gold), 백그라운드 작업 실패·패닉. 종료 시 미전송 이벤트 플러시.
+
+로컬 로그는 journald로 계속 남는다: `journalctl -u mentoai -f` / `--vacuum-size=100M`로 보존 상한 설정 권장.
+
+---
+
 ## 📈 확장 설계서 (재도입 시점)
 
 | 신호 | 도입 기술 | 마이그레이션 경로 |

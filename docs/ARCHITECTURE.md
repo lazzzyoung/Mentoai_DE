@@ -68,6 +68,7 @@ flowchart BT
         vector["vector<br/>float32 직렬화·코사인"]
         scoring["scoring<br/>점수/사유 휴리스틱"]
         web["web<br/>UI 임베드"]
+        tel["telemetry<br/>에러 리포팅 포트·Noop"]
     end
 
     subgraph CONFIG["설정"]
@@ -87,6 +88,7 @@ flowchart BT
         embg["embedding/gemini<br/>임베딩 참조구현"] --> config
         llm["llm<br/>AnalysisGenerator 포트"] --> domain
         llmg["llm/gemini<br/>LLM 참조구현"] --> domain
+        tels["telemetry/sentry<br/>에러리포팅 참조구현"] --> tel
     end
 
     subgraph AUTHN["인증"]
@@ -147,6 +149,7 @@ flowchart BT
     cmd --> sch
     cmd --> scra
     cmd --> ssqlite
+    cmd --> tels
 ```
 
 읽는 법: 화살표는 "import한다"는 뜻이고, 항상 **위(소비자) → 아래(의존 대상)** 방향이다.
@@ -165,7 +168,9 @@ flowchart BT
 | `internal/envfile` | `.env` 읽기 + **줄 보존 편집기**. 임베딩 모델 전환이 파일을 통째로 재작성하지 않고 주석·순서를 유지하게 하기 위해 존재 | `Load`(환경변수 반영, 기존값 우선), `Update`(in-place 교체 + `.bak` 백업), `HasKey` | 없음 |
 | `internal/vector` | 임베딩 벡터의 물리 표현. SQLite BLOB ↔ `[]float32` 변환과 유사도 수학을 앱 전체에서 한 곳에 모은다 | `Encode`(float32 LE), `Decode`, `Cosine` | 없음 |
 | `internal/scoring` | LLM 없이 즉시 계산되는 추천 점수/사유 규칙. 원본 Python과 결과가 1:1인 순수 함수들 | `SimilarityToScore`(clamp 40~99), `SkillOverlap`, `BuildReason`, `CareerLabel` | 없음 |
-| `internal/web` | 바닐라 JS PWA를 바이너리에 박제(`embed.FS`). 빌드 도구 없이 정적 UI를 같은 프로세스에서 서빙 | `FS()` | 없음 |
+| `internal/web` | 바닐라 JS PWA를 바이너리에 박제(`embed.FS`). 빌드 도구 없이 정적 UI를 같은 프로세스에서 서빙 | `FS()` |
+| `internal/telemetry` | 에러 리포팅의 포트. api·pipeline·ops가 이 포트에만 의존하고, `SENTRY_DSN` 미설정 시 **Noop**(완전 off)이 주입된다 | `Reporter`(CaptureError/Close), `Noop()` |
+| `internal/telemetry/sentry` | **참조 구현** — Sentry SaaS로 에러를 비동기 전송(블로킹 없음, 초과 시 드롭). 바이너리 +~2MB, RAM 영향 수 MB 이하 | `New(dsn, env)`(빈 DSN → Noop), `CaptureError`(태그 지원), `Close`(종료 시 플러시) | 없음 |
 
 ### 4.2 설정
 
@@ -221,7 +226,7 @@ flowchart BT
 
 | 모듈 | 의미 | 핵심 |
 |---|---|---|
-| `internal/pipeline` | Medallion 파이프라인. 각 단계가 함수 하나(`Bronze`/`Silver`/`Gold`)라서 CLI·스케줄러·어드민이 같은 코드를 쓴다 | `Bronze`(스크래퍼 격리 — 한 소스 실패가 전체를 죽이지 않음), `Silver`(전량 재정제 + upsert, `updated_at` 갱신), `Gold`(Pending=신규/stale/모델불일치 재임베딩, 차원 불일치 하드 에러), `RunPipeline`(이력 기록 success/failed) |
+| `internal/pipeline` | Medallion 파이프라인. 각 단계가 함수 하나(`Bronze`/`Silver`/`Gold`)라서 CLI·스케줄러·어드민이 같은 코드를 쓴다 | `Bronze`(스크래퍼 격리 — 한 소스 실패가 전체를 죽이지 않음), `Silver`(전량 재정제 + upsert, `updated_at` 갱신), `Gold`(Pending=신규/stale/모델불일치 재임베딩, 차원 불일치 하드 에러), `RunPipeline`(이력 기록 success/failed + 실패 단계 `stage` 태그로 리포팅) |
 | `internal/scrapers` | 수집기 2종. `Scraper` 시그니처 한 개로 파이프라인에 주입된다 | `wanted`(JSON API 페이지네이션+랜덤 지연), `work24`(goquery HTML 파싱 — 리스트/상세, 정규식 추출) |
 
 ### 4.8 서비스

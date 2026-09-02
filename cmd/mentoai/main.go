@@ -175,7 +175,9 @@ func cmdServe(args []string) error {
 	slog.Info("종료 신호 수신 — 서버를 닫는다")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	err = srv.Shutdown(shutdownCtx)
+	app.Reporter.Close(5 * time.Second) // 대기 중인 에러 이벤트 마저 전송
+	return err
 }
 
 func dirOf(path string) string {

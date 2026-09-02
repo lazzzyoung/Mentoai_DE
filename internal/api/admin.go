@@ -13,7 +13,7 @@ import (
 func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 	status, err := s.admin.Status(r.Context())
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, status)
@@ -23,7 +23,7 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminPipelineRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := s.admin.ListRuns(r.Context(), 20)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, runs)
@@ -32,7 +32,7 @@ func (s *Server) adminPipelineRuns(w http.ResponseWriter, r *http.Request) {
 // adminTriggerPipeline은 POST /api/v1/admin/pipeline 다.
 func (s *Server) adminTriggerPipeline(w http.ResponseWriter, r *http.Request) {
 	if err := s.admin.TriggerPipeline(r.Context()); err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "started"})
@@ -52,7 +52,7 @@ func (s *Server) adminJobsList(w http.ResponseWriter, r *http.Request) {
 	}
 	jobs, err := s.admin.ListJobs(r.Context(), query, limit)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, jobs)
@@ -65,7 +65,7 @@ func (s *Server) adminDeleteJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.admin.DeleteJob(r.Context(), jobID); err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -89,7 +89,7 @@ func (s *Server) adminCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.admin.CreateUser(r.Context(), p)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, user)
@@ -107,7 +107,7 @@ func (s *Server) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.admin.UpdateUser(r.Context(), userID, p)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
@@ -120,7 +120,7 @@ func (s *Server) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.admin.DeleteUser(r.Context(), userID); err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -155,7 +155,7 @@ func (s *Server) adminSwitchEmbedding(w http.ResponseWriter, r *http.Request) {
 
 	target, err := s.admin.ResolveEmbeddingTarget(provider, model, nil)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	if !s.admin.StartBackground("embedding_switch", func(ctx context.Context) error {
@@ -172,7 +172,7 @@ func (s *Server) adminSwitchEmbedding(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminCacheList(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.admin.ListCache(r.Context())
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, rows)
@@ -182,7 +182,7 @@ func (s *Server) adminCacheList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminCacheClear(w http.ResponseWriter, r *http.Request) {
 	deleted, err := s.admin.ClearCache(r.Context())
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int64{"deleted": deleted})
@@ -199,7 +199,7 @@ func (s *Server) adminCacheDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.admin.DeleteCache(r.Context(), jobID, userID); err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

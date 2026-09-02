@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -65,6 +66,11 @@ type AuthService interface {
 	Authenticated(r *http.Request) (userID int64, username string, ok bool)
 }
 
+// ErrorReporter는 에러 리포팅 포트다 (telemetry.Reporter가 구조적으로 충족).
+type ErrorReporter interface {
+	CaptureError(err error, tags map[string]string)
+}
+
 // ---------- 서버 ----------
 
 // Server는 HTTP 핸들러 묶음이다.
@@ -76,17 +82,39 @@ type Server struct {
 	admin        AdminService
 	auth         AuthService
 	authRequired bool
+	reporter     ErrorReporter
 }
 
 // New는 의존성을 주입받아 서버를 조립한다.
-func New(users UsersLister, rec Recommender, ana Analyzer, admin AdminService, auth AuthService, authRequired bool) *Server {
-	s := &Server{mux: http.NewServeMux(), users: users, rec: rec, ana: ana, admin: admin, auth: auth, authRequired: authRequired}
+func New(users UsersLister, rec Recommender, ana Analyzer, admin AdminService, auth AuthService, authRequired bool, reporter ErrorReporter) *Server {
+	s := &Server{mux: http.NewServeMux(), users: users, rec: rec, ana: ana, admin: admin, auth: auth, authRequired: authRequired, reporter: reporter}
 	s.routes()
 	return s
 }
 
-// Handler는 루트 핸들러를 돌려준다.
-func (s *Server) Handler() http.Handler { return s.mux }
+// Handler는 루트 핸들러를 돌려준다. panic은 리포팅 후 500으로 변환한다.
+func (s *Server) Handler() http.Handler {
+	return s.recoverPanics(s.mux)
+}
+
+// recoverPanics는 핸들러 패닉을 잡아 리포팅하고 일관된 500 응답을 돌려준다.
+// (net/http 기본 동작은 연결만 끊기 때문에 클라이언트가 에러 형식을 못 받는다.)
+func (s *Server) recoverPanics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				s.reporter.CaptureError(
+					fmt.Errorf("핸들러 패닉: %v", rec),
+					map[string]string{"method": r.Method, "path": r.URL.Path, "kind": "panic"},
+				)
+				slog.Error("핸들러 패닉", "path", r.URL.Path, "panic", rec)
+				writeJSON(w, http.StatusInternalServerError,
+					map[string]string{"detail": "내부 오류가 발생했습니다"})
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -143,8 +171,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // writeError는 서비스 오류를 FastAPI와 같은 {"detail": ...} 형식으로 변환한다.
-func writeError(w http.ResponseWriter, err error) {
+// 5xx(내부 오류)는 에러 리포팅으로 전송한다 — 4xx는 클라이언트 오류라 제외.
+func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	httpErr := domain.AsHTTPError(err)
+	if httpErr.Code >= 500 && s.reporter != nil {
+		s.reporter.CaptureError(err, map[string]string{
+			"method": r.Method, "path": r.URL.Path, "status": strconv.Itoa(httpErr.Code),
+		})
+	}
 	if httpErr.Code >= 500 {
 		slog.Error("요청 처리 실패", "status", httpErr.Code, "error", err)
 	}

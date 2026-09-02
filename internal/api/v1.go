@@ -8,7 +8,7 @@ import (
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.users.ListSummaries(r.Context())
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, users)
@@ -22,7 +22,7 @@ func (s *Server) recommendJobs(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.rec.Recommend(r.Context(), userID)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -40,7 +40,7 @@ func (s *Server) analyzeJob(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.ana.Analyze(r.Context(), jobID, userID)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)

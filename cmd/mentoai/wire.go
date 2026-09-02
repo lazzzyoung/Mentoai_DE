@@ -22,6 +22,8 @@ import (
 	"github.com/Chae-JS/mentoai/internal/scheduler"
 	"github.com/Chae-JS/mentoai/internal/scrapers"
 	"github.com/Chae-JS/mentoai/internal/storage/sqlite"
+	"github.com/Chae-JS/mentoai/internal/telemetry"
+	sentryreporter "github.com/Chae-JS/mentoai/internal/telemetry/sentry"
 )
 
 const envFile = ".env"
@@ -82,6 +84,7 @@ type App struct {
 	Server   *api.Server
 	Schedule *scheduleRef
 	Pipeline *pipelineAdapter
+	Reporter telemetry.Reporter
 }
 
 // Wire는 전체 의존성 그래프를 구성한다(composition root).
@@ -103,6 +106,9 @@ func Wire(settings config.Settings) (*App, error) {
 	}
 	active := embedding.NewAtomic(initial)
 
+	// --- 에러 리포팅: SENTRY_DSN 없으면 Noop (기능 off, 비용 0) ---
+	reporter := sentryreporter.New(settings.SentryDSN, settings.SentryEnvironment)
+
 	// --- 파이프라인 ---
 	deps := pipeline.Deps{
 		Raw:      store.Raw,
@@ -110,6 +116,7 @@ func Wire(settings config.Settings) (*App, error) {
 		Embeds:   store.Embeddings,
 		Runs:     store.Runs,
 		Embedder: embedderRef{active: active},
+		Reporter: reporter,
 		Scrapers: []pipeline.Scraper{
 			scrapers.NewWanted(settings).Scrape,
 			scrapers.NewWork24(settings).Scrape,
@@ -125,7 +132,7 @@ func Wire(settings config.Settings) (*App, error) {
 
 	sched := &scheduleRef{holder: holder}
 	opsService := ops.New(holder, store.Users, store.Raw, store.Jobs, store.Embeddings,
-		store.Cache, store.Runs, store, registry, active, runner, sched)
+		store.Cache, store.Runs, store, registry, active, runner, sched, reporter)
 
 	// --- 인증: 설정이 채워진 공급자만 활성화된다 (기본 OFF) ---
 	var providers []auth.Provider
@@ -164,8 +171,9 @@ func Wire(settings config.Settings) (*App, error) {
 		Store:    store,
 		Ops:      opsService,
 		Active:   active,
-		Server:   api.New(store.Users, rec, ana, opsService, authService, settings.AuthRequired),
+		Server:   api.New(store.Users, rec, ana, opsService, authService, settings.AuthRequired, reporter),
 		Schedule: sched,
 		Pipeline: runner,
+		Reporter: reporter,
 	}, nil
 }

@@ -23,6 +23,13 @@ type Deps struct {
 	Runs     RunRecorder
 	Embedder EmbedderProvider
 	Scrapers []Scraper
+	// Reporter는 실패 시 에러 리포팅이다 (nil이면 전송하지 않는다).
+	Reporter ErrorReporter
+}
+
+// ErrorReporter는 에러 리포팅 포트다 (telemetry.Reporter가 구조적으로 충족).
+type ErrorReporter interface {
+	CaptureError(err error, tags map[string]string)
 }
 
 // 포트는 소비자가 필요한 만큼만 선언한다(인터페이스 분리).
@@ -156,9 +163,12 @@ func RunPipeline(ctx context.Context, d Deps, runs RunRecorder, expectedDim int)
 		return domain.PipelineResult{}, err
 	}
 
-	result, err := run(ctx, d, expectedDim)
+	result, stage, err := run(ctx, d, expectedDim)
 	if err != nil {
-		slog.Error("파이프라인 실패", "error", err)
+		slog.Error("파이프라인 실패", "stage", stage, "error", err)
+		if d.Reporter != nil {
+			d.Reporter.CaptureError(err, map[string]string{"stage": stage})
+		}
 		msg := err.Error()
 		if finishErr := runs.Finish(ctx, runID, 0, 0, 0, "failed", &msg, time.Now()); finishErr != nil {
 			slog.Error("실행 이력 기록 실패", "error", finishErr)
@@ -175,22 +185,26 @@ func RunPipeline(ctx context.Context, d Deps, runs RunRecorder, expectedDim int)
 	return result, nil
 }
 
-func run(ctx context.Context, d Deps, expectedDim int) (domain.PipelineResult, error) {
+// run은 단계를 순서대로 실행하고 실패한 단계명을 함께 돌려준다.
+func run(ctx context.Context, d Deps, expectedDim int) (result domain.PipelineResult, stage string, err error) {
+	stage = "bronze"
 	scraped, err := Bronze(ctx, d)
 	if err != nil {
-		return domain.PipelineResult{}, err
+		return domain.PipelineResult{}, stage, err
 	}
+	stage = "silver"
 	silverUpserted, err := Silver(ctx, d)
 	if err != nil {
-		return domain.PipelineResult{}, err
+		return domain.PipelineResult{}, stage, err
 	}
+	stage = "gold"
 	embedded, err := Gold(ctx, d, expectedDim)
 	if err != nil {
-		return domain.PipelineResult{}, err
+		return domain.PipelineResult{}, stage, err
 	}
 	return domain.PipelineResult{
 		Scraped:        scraped,
 		SilverUpserted: silverUpserted,
 		Embedded:       embedded,
-	}, nil
+	}, stage, nil
 }

@@ -30,7 +30,7 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 	provider := r.PathValue("provider")
 	state, err := randomState()
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	loginURL, ok := s.auth.LoginURL(provider, state)
@@ -61,7 +61,7 @@ func (s *Server) authCallback(w http.ResponseWriter, r *http.Request) {
 
 	token, _, err := s.auth.Login(r.Context(), provider, code, "")
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	s.auth.SetSessionCookie(w, token)
@@ -93,7 +93,7 @@ func (s *Server) authTossCallback(w http.ResponseWriter, r *http.Request) {
 
 	token, user, err := s.auth.Login(r.Context(), "toss", code, body.Referrer)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	s.auth.SetSessionCookie(w, token)
@@ -109,7 +109,7 @@ func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.auth.Me(r.Context(), userID)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
@@ -129,7 +129,7 @@ func (s *Server) authUpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.auth.UpdateMe(r.Context(), userID, p)
 	if err != nil {
-		writeError(w, err)
+		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
