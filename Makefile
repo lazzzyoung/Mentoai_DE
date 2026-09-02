@@ -1,6 +1,6 @@
 BINARY := bin/mentoai
 
-.PHONY: build run test lint fmt check tidy clean migrate seed pipeline up down logs logs-caddy deploy ubuntu-setup ubuntu-setup-go release deploy-native
+.PHONY: build run test lint fmt check tidy check-secrets hooks migrate seed pipeline up down logs logs-caddy deploy ubuntu-setup ubuntu-setup-go release deploy-native
 
 build:
 	go build -trimpath -ldflags "-s -w" -o $(BINARY) ./cmd/mentoai
@@ -17,7 +17,7 @@ lint:
 fmt:
 	gofmt -w cmd internal
 
-check: lint test
+check: check-secrets lint test
 
 tidy:
 	go mod tidy
@@ -74,3 +74,13 @@ deploy-native:
 	@test -n "$(HOST)" || { echo "사용법: make deploy-native HOST=user@host [ARCH=amd64|arm64] [PORT=22]"; exit 1; }
 	test -n "$$ARCH" || ARCH=amd64; test -n "$$PORT" || PORT=22
 	bash scripts/deploy-native.sh "$(HOST)" "$$ARCH" "$$PORT"
+
+# --- 보안 ---
+
+# 시크릿 유출 1차 검사 (배포 스크립트·CI·pre-commit이 호출)
+check-secrets:
+	bash scripts/check-secrets.sh
+
+# pre-commit 훅 설치 (커밋마다 시크릿 검사)
+hooks:
+	install -m 0755 scripts/hooks/pre-commit .git/hooks/pre-commit

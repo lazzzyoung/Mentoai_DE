@@ -13,6 +13,10 @@ cd "$(dirname "$0")/.."   # 저장소 루트 기준 실행
 log()  { printf '\033[1;36m[mentoai]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[mentoai]\033[0m %s\n' "$*"; }
 
+# --- 시크릿 1차 게이트: 유출 징후가 있으면 배포 중단 ---
+log "시크릿 사전 점검"
+bash scripts/check-secrets.sh
+
 # --- 권한: docker를 바로 쓸 수 없으면 sudo로 재실행 (apt 설치에도 root 필요) ---
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then

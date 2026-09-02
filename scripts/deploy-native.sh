@@ -34,6 +34,10 @@ run()  { ssh "${SSH_OPTS[@]}" "$TARGET" "sudo sh -c '$*'"; }   # 서버에서 ro
 
 cd "$(dirname "$0")/.."
 
+# --- 시크릿 1차 게이트: 유출 징후가 있으면 배포 중단 ---
+log "시크릿 사전 점검"
+bash scripts/check-secrets.sh || die "시크릿 유출 징후 발견 — 배포 중단"
+
 command -v rsync >/dev/null 2>&1 || die "로컬에 rsync 필요 (brew install rsync / apt install rsync)"
 [[ -f Caddyfile ]] || die "저장소 루트에서 실행하세요 (Caddyfile 없음)"
 

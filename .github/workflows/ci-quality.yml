@@ -24,6 +24,9 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Secret scan
+        run: bash scripts/check-secrets.sh
+
       - name: Staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
 

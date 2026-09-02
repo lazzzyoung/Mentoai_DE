@@ -222,6 +222,23 @@ mentoai_de/
 - gold의 재임베딩 판정(신규 / `embedded_at < updated_at` / 모델 불일치)도 동일하다.
 - fastembed(로컬 ONNX)는 Go에 직접 대체재가 없어 미포함. 필요하면 ONNX Runtime 바인딩으로 `Embedder`를 구현해 레지스트리에 등록하면 된다.
 
+## 🔐 시크릿 관리
+
+원칙: **시크릿은 로컬 `.env`와 배포 서버의 `.env`에만 존재한다.** 코드·git·바이너리에는 절대 없다.
+
+`scripts/check-secrets.sh`가 3중으로 검사한다 (배포 스크립트·CI·pre-commit에서 자동 실행):
+
+1. **추적 검사** — `.env` 계열 파일이 git에 추적되면 즉시 실패 (`.env.example` 템플릿만 허용)
+2. **패턴 스캔** — 추적 파일 전체에서 Google/AWS/Sentry/OpenAI/Slack/Telegram 토큰·프라이빗 키 등 8종 패턴 검사
+3. **값 기반 검사** — 로컬 `.env`의 실제 시크릿 값이 코드나 빌드 산출물(바이너리)에 새었는지 검사
+
+```bash
+make check-secrets   # 수동 실행
+make hooks           # pre-commit 훅 설치 (커밋마다 자동 검사)
+```
+
+배포 스크립트(`deploy.sh`·`deploy-native.sh`)는 **빌드·전송 전에 이 검사를 통과해야** 진행된다.
+
 ## 📈 모니터링 & 에러 알림
 
 서버에 모니터링 스택을 얹지 않고, **무료 클라우드 서비스가 바깥에서 감시**하는 구성(512MB 인스턴스 기준 RAM 영향 ≈ 0):
