@@ -9,6 +9,8 @@ v2(Kafka + Spark + Airflow + S3 + Qdrant, 컨테이너 9개) → v3(FastAPI + Po
 - **벡터 검색**: pgvector HNSW 대신 프로세스 메모리 인덱스(코사인 전수 검색). 수천~수만 건 규모에서 쿼리당 수 ms.
 - **DI**: 모든 계층이 인터페이스(port)에 의존하고 `cmd/mentoai`(composition root)에서 생성자 주입으로 조립된다. 임베딩 공급자는 `Embedder` 인터페이스 + 레지스트리로 교체 가능하며, **Gemini API가 참조 구현**이다.
 
+> 📐 **전체 아키텍처 문서**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 모듈별 의미·책임, 실측 import 의존 그래프, 핵심 흐름 시퀀스, 데이터 모델, 설정 참조, 확장 가이드
+
 ## 🏗️ Architecture
 
 ```
