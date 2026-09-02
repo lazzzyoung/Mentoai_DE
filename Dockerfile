@@ -6,10 +6,14 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -o /out/mentoai ./cmd/mentoai
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -o /out/mentoai ./cmd/mentoai \
+	&& mkdir -p /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/mentoai /mentoai
+# nonroot(65532) 소유의 /data를 이미지에 심는다 — 새 볼륨 마운트 시 소유권이 복사되어
+# distroless nonroot 유저로도 SQLite 파일을 쓸 수 있다.
+COPY --from=build --chown=65532:65532 /out/data /data
 ENV SQLITE_PATH=/data/mentoai.db
 VOLUME ["/data"]
 EXPOSE 8000

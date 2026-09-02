@@ -16,6 +16,9 @@ type Settings struct {
 	EnvFile    string
 	SQLitePath string
 
+	// serve 시작 시 마이그레이션 후 샘플 사용자를 자동 적재(멱등)한다.
+	SeedOnStart bool
+
 	GoogleAPIKey string
 	GeminiModel  string
 
@@ -53,8 +56,9 @@ type Settings struct {
 func Load(envFile string) Settings {
 	_ = envfile.Load(envFile)
 	return Settings{
-		EnvFile:    envFile,
-		SQLitePath: get("SQLITE_PATH", "data/mentoai.db"),
+		EnvFile:     envFile,
+		SQLitePath:  get("SQLITE_PATH", "data/mentoai.db"),
+		SeedOnStart: getBool("SEED_ON_START", false),
 
 		GoogleAPIKey: get("GOOGLE_API_KEY", ""),
 		GeminiModel:  get("GEMINI_MODEL", "gemini-3-flash-preview"),

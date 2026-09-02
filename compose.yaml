@@ -1,19 +1,39 @@
-# Go 단일 바이너리 + 내장 SQLite: 외부 서비스 컨테이너가 없다.
-# API 서버 하나만 띄우면 전체 스택이다 (시작 시 마이그레이션 자동 적용).
+# 원터치 배포: `make up` 한 번으로 api + caddy가 함께 뜬다.
+# api는 시작 시 마이그레이션(및 SEED_ON_START=true면 시드)을 자동 적용하고,
+# caddy가 80/443을 받아 자동 HTTPS(Let's Encrypt 또는 localhost 내부 CA) + HTTP/3로 프록시한다.
 services:
   api:
     build: .
     container_name: mentoai-api
+    restart: unless-stopped
     env_file:
       - path: .env
         required: false
     environment:
       SQLITE_PATH: /data/mentoai.db
       SCHEDULE_ENABLED: "true"
-    ports:
-      - "8000:8000"
+      SEED_ON_START: "true"
     volumes:
       - data:/data
 
+  caddy:
+    image: caddy:2
+    container_name: mentoai-caddy
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"        # HTTP → HTTPS 리다이렉트, ACME http-01
+      - "443:443"      # HTTPS (HTTP/1.1 + HTTP/2)
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data   # 인증서 저장 (갱신간 유지)
+      - caddy_config:/config
+
 volumes:
   data:
+  caddy_data:
+  caddy_config:

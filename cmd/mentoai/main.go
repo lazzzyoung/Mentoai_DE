@@ -24,6 +24,7 @@ import (
 	"github.com/Chae-JS/mentoai/internal/domain"
 	"github.com/Chae-JS/mentoai/internal/pipeline"
 	"github.com/Chae-JS/mentoai/internal/scheduler"
+	"github.com/Chae-JS/mentoai/internal/storage/sqlite"
 )
 
 func main() {
@@ -132,6 +133,12 @@ func cmdServe(args []string) error {
 	if len(applied) > 0 {
 		slog.Info("migration applied", "files", strings.Join(applied, ", "))
 	}
+	if settings.SeedOnStart {
+		if err := seedUsers(ctx, app.Store); err != nil {
+			return fmt.Errorf("시드 실패: %w", err)
+		}
+		slog.Info("시드 완료 (SEED_ON_START=true)")
+	}
 
 	sched, err := scheduler.Start(settings, app.Holder, func(ctx context.Context) (domain.PipelineResult, error) {
 		return app.Pipeline.RunPipeline(ctx)
@@ -215,14 +222,22 @@ func cmdSeed() error {
 		return err
 	}
 	defer app.Store.Close()
-	ctx := context.Background()
+	if err := seedUsers(context.Background(), app.Store); err != nil {
+		return err
+	}
+	fmt.Printf("시드 완료: 사용자 %d명\n", len(sampleUsers))
+	return nil
+}
+
+// seedUsers는 샘플 사용자/스펙을 멱등 upsert한다 (CLI seed와 SEED_ON_START 공용).
+func seedUsers(ctx context.Context, store *sqlite.Storage) error {
 	for _, u := range sampleUsers {
-		id, err := app.Store.Users.Insert(ctx, u.username)
+		id, err := store.Users.Insert(ctx, u.username)
 		if err != nil {
 			return err
 		}
 		if id == 0 {
-			row, err := app.Store.Users.FindByUsername(ctx, u.username)
+			row, err := store.Users.FindByUsername(ctx, u.username)
 			if err != nil {
 				return err
 			}
@@ -231,11 +246,10 @@ func cmdSeed() error {
 			}
 			id = row.ID
 		}
-		if err := app.Store.Users.UpsertSpec(ctx, id, u.desiredJob, u.careerYears, u.skills); err != nil {
+		if err := store.Users.UpsertSpec(ctx, id, u.desiredJob, u.careerYears, u.skills); err != nil {
 			return err
 		}
 	}
-	fmt.Printf("시드 완료: 사용자 %d명\n", len(sampleUsers))
 	return nil
 }
 

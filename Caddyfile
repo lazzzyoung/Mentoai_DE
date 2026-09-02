@@ -1,0 +1,27 @@
+# MentoAI Caddy 리버스 프록시
+# - HTTPS 자동 발급: CADDY_DOMAIN=localhost → 내부 CA(자체서명), 실제 도메인 → Let's Encrypt 자동 발급/갱신
+# - HTTP/3(QUIC) + HTTP/2: HTTPS 사이트에서 기본 활성화 (클라이언트가 지원하면 h3로 협상)
+# - HTTP/1.1 80포트 → HTTPS 자동 리다이렉트
+#
+# 환경변수는 compose에서 주입한다: CADDY_DOMAIN (기본 localhost)
+
+{
+	admin off
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$CADDY_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy api:8000
+}

@@ -53,7 +53,27 @@ go run ./cmd/mentoai pipeline # 수집→정제→임베딩
 go run ./cmd/mentoai serve    # http://localhost:8000 (관리자: /admin)
 ```
 
-Docker: `make up` — API 컨테이너 1개(데이터 볼륨 1개)만 뜨고, 시작 시 마이그레이션이 자동 적용된다.
+## 📦 배포 (원터치, Caddy 자동 HTTPS + HTTP/3)
+
+```bash
+make up        # 이게 전부다: api 빌드+기동(마이그레이션·시드 자동) + caddy(HTTPS 자동)
+```
+
+- `CADDY_DOMAIN=localhost`(기본)이면 **내부 CA 자체서명 인증서**로 HTTPS 구동 — `curl -k` 또는 브라우저 경고 진행으로 확인.
+- `.env`에 `CADDY_DOMAIN=여러분의도메인.com`을 넣고 80/443(tcp+**udp**)을 열면 **Let's Encrypt 인증서가 자동 발급·갱신**된다 (ACME 이메일 없이도 동작).
+- **HTTP/3(QUIC)는 기본 활성** — HTTPS 사이트에서 `alt-svc: h3=":443"`를 광고하고, 지원 클라이언트는 QUIC으로 협상된다(미지원 시 HTTP/2로 자동 폴백). 검증: `curl --http3-only https://도메인/health`.
+- HTTP/1.1 80포트는 308으로 HTTPS에 리다이렉트. zstd/gzip 압축과 기본 보안 헤더(HSTS·nosniff·X-Frame-Options·Referrer-Policy) 적용.
+- api는 호스트에 8000 포트를 노출하지 않고 caddy 뒤에만 있다 (`docker compose exec api /mentoai status`로 내부 조회 가능).
+
+### 단일 컨테이너 옵션
+
+`deploy/Dockerfile.single`은 Caddy와 앱을 **한 컨테이너**에 넣은 변형이다:
+
+```bash
+docker build -f deploy/Dockerfile.single -t mentoai-single . && docker run -p 443:443 -p 443:443/udp -e CADDY_DOMAIN=localhost mentoai-single
+```
+
+컨테이너 수가 1개로 줄지만, 감독 프로세스가 없어 **앱이 죽어도 컨테이너가 살아있는 것처럼 보이며 502만 반환**한다(실측 확인). 기본 구성은 compose 2-서비스(api `restart: unless-stopped` + caddy)를 권장한다.
 
 ### CLI
 
@@ -114,6 +134,9 @@ mentoai_de/
 │   │   └── gemini/            # 참조 구현 (batch 100, RETRIEVAL_QUERY/DOCUMENT)
 │   ├── llm/                   # AnalysisGenerator 포트
 │   │   └── gemini/            # 구조화 출력 구현
+│   ├── auth/                  # 로그인 포트 + 세션(HMAC) + 서비스
+│   │   ├── google/            # 구글 OAuth2
+│   │   └── toss/              # 앱인토스 토스 로그인 (mTLS)
 │   ├── silver/                # 정제 순수 함수 (normalize_wanted/work24, full_text)
 │   ├── scoring/               # 점수/사유 휴리스틱 순수 함수
 │   ├── pipeline/              # bronze / silver / gold / runner
@@ -124,7 +147,9 @@ mentoai_de/
 │   ├── scheduler/             # cron 스케줄러
 │   ├── api/                   # HTTP 핸들러 (net/http ServeMux)
 │   └── web/                   # 정적 UI 임베드 (internal/web/static)
-├── compose.yaml               # api 1개 서비스 + 데이터 볼륨
+├── deploy/                    # 단일 컨테이너 변형 (선택)
+├── Caddyfile                  # 자동 HTTPS·HTTP/3 리버스 프록시
+├── compose.yaml               # api + caddy (make up 원터치)
 ├── Dockerfile                 # 멀티스테이지 → distroless 단일 바이너리
 └── .github/workflows/         # gofmt / vet / test
 ```
