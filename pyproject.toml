@@ -1,49 +1,72 @@
 [project]
-name = "mentoai-de"
-version = "0.1.0"
-description = "MentoAI data engineering and RAG server project"
+name = "mentoai"
+version = "1.0.0"
+description = "MentoAI - Postgres-everything career roadmap RAG service"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "asyncpg",
-    "fastapi",
-    "langchain",
-    "langchain-community",
-    "langchain-core",
-    "langchain-google-genai>=2.0.0",
-    "langchain-huggingface",
-    "langchain-qdrant",
-    "pydantic",
-    "python-dotenv",
-    "qdrant-client>=1.9.0",
-    "sentence-transformers",
-    "uvicorn",
+    "apscheduler>=3.10,<4",
+    "asyncpg>=0.30",
+    "beautifulsoup4>=4.12",
+    "fastapi>=0.115",
+    "fastembed>=0.6",
+    "google-genai>=1.0",
+    "httpx>=0.27",
+    "lxml>=5.0",
+    "numpy>=1.26",
+    "pgvector>=0.3",
+    "polars>=1.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "typer>=0.12",
+    "uvicorn[standard]>=0.30",
 ]
+
+[project.scripts]
+mentoai = "mentoai.cli:app"
 
 [dependency-groups]
 dev = [
-    "pytest",
-    "ruff",
-    "ty",
+    "pytest>=8",
+    "ruff>=0.6",
+    "ty>=0.0.1a5",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mentoai"]
+
+[tool.uv]
+package = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
-extend-exclude = [
-    ".venv",
-    ".uv-cache",
-    "infra/postgres_data",
-    "infra/qdrant_storage",
-]
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = [".venv", ".models"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "B", "UP"]
+select = [
+    "E", "F", "I", "W", "B", "UP",
+    "ARG",   # 미사용 인자
+    "C4",    # comprehension 개선
+    "SIM",   # 제어흐름 단순화
+    "RET",   # return 정리
+    "ERA",   # 주석처리된 죽은 코드
+    "T20",   # print 금지
+    "RUF",   # ruff 자체 규칙
+]
 ignore = ["E501", "W293"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
 [tool.ruff.lint.isort]
-known-first-party = ["server", "kafka", "spark", "dags"]
+known-first-party = ["mentoai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]

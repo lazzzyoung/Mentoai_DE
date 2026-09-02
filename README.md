@@ -1,312 +1,153 @@
 # MentoAI: Personalized AI Career Roadmap Service
 
-**MentoAI**는 사용자의 기술 스펙과 희망 직무를 분석하여, 최신 채용 공고 기반의 맞춤형 커리어 성장 로드맵을 제공하는 AI 서비스입니다. 
-데이터 엔지니어링 파이프라인(Kafka, Spark, Airflow)과 RAG(Retrieval-Augmented Generation) 기술을 결합하여, 단순한 공고 추천을 넘어 구체적인 학습 전략과 액션 플랜을 제시합니다.
+**MentoAI**는 사용자의 기술 스펙과 희망 직무를 분석하여, 최신 채용 공고 기반의 맞춤형 커리어 로드맵을 제공하는 AI 서비스입니다.
 
-## 🏗️ System Architecture
+v2(과거) 아키텍처(Kafka + Spark + Airflow + S3 + Qdrant, 컨테이너 9개)를 **비용과 복잡도에 맞게 재설계**한 결과물입니다.
+핵심 변경: **Medallion 구조를 Postgres 스키마로 내재화**하고, 벡터 검색은 **pgvector**, 임베딩은 **fastembed(로컬 ONNX)**, LLM은 **Gemini 구조화 출력**으로 통합했습니다. 컨테이너 9개 → **2개(api + postgres)**.
 
-데이터의 수집부터 서비스 제공까지의 전체 데이터 흐름도입니다.
+## 🏗️ Architecture
 
-[Data Ingestion Layer]             [Data Processing Layer]
-+-----------------+               +--------------------------+
-|  Job Sites      |   Crawling    |  Apache Spark (ETL)      |
-| (Wanted, etc.)  | ------------> |                          |
-+-----------------+               | 1. Ingest (Kafka->S3)    |-----> [AWS S3 (Bronze)]
-         |                        | 2. Process (Clean Data)  |-----> [PostgreSQL (Silver)]
-         v                        | 3. Upsert (Embedding)    |-----> [Qdrant (Gold)]
-+-----------------+               +--------------------------+
-|  Apache Kafka   |                            ^
-| (career_raw)    |                            |
-+-----------------+                 (Trigger / Schedule)
-         |                                     |
-         +---------------------------> +----------------+
-                                       | Apache Airflow |
-                                       +----------------+
+```
+[Wanted API]  ─┐
+[work24 리스트] ─┴─► httpx 스크래퍼 ─► bronze.raw_postings (JSONB 원본 보존)
+                                        │ Polars 정제 (HTML 제거·소스 통합·중복 제거)
+                                        ▼
+                                    silver.jobs (통합 공고 스키마)
+                                        │ 임베딩: fastembed e5-large (로컬) 또는 Gemini API
+                                        ▼
+                                    silver.job_embeddings (pgvector, HNSW cosine)
+                                        │
+             APScheduler (cron) ────────┤ 전체 파이프라인 스케줄링
+                                        ▼
+                       FastAPI ─► 추천: pgvector 유사도 + 휴리스틱 (LLM 0호출)
+                                └► 상세 분석: Gemini 구조화 출력 + analysis_cache (1회만 호출)
+```
 
-[Service & AI Layer]
-+--------+       +------------------+       +------------------+
-|        | <---> |  FastAPI Server  | <---> |    Qdrant DB     |
-|  User  |       |   (RAG Engine)   |       |  (Vector Search) |
-|        |       +------------------+       +------------------+
-+--------+                 ^
-                           |
-                 +------------------+
-                 |   Google Gemini  |
-                 |  (Reasoning/LLM) |
-                 +------------------+
+## 🧰 Stack
 
+| 영역 | 기술 | 비고 |
+|---|---|---|
+| 언어/패키징 | Python 3.12+, uv | 단일 lockfile, `uv run mentoai ...` |
+| DB | PostgreSQL 17 + pgvector | `pgvector/pgvector:pg17` 이미지, Medallion = 스키마 |
+| 마이그레이션 | 버전 관리 SQL (`src/mentoai/migrations/`) | 의존성 0개의 40줄 러너 |
+| 수집 | httpx + BeautifulSoup | Wanted API / work24 리스트+상세 |
+| 변환 | Polars | in-process, JVM 없음 |
+| 임베딩 | fastembed e5-large / Gemini API (토글) | 둘 다 1024차원 → 컬럼/인덱스 불변 |
+| LLM | google-genai (Gemini Flash) | Pydantic `response_schema` 구조화 출력, LangChain 제거 |
+| API | FastAPI + uvicorn | v1 단일 버전 |
+| UI | FastAPI가 직접 서빙하는 정적 페이지 | 모놀리식 — 빌드 도구·npm 없음, 바닐라 JS |
+| PWA | manifest + 서비스워커 | 앱 설치 가능, 앱 셸 오프라인 캐시(데이터는 항상 네트워크), 오프라인 배너 |
+| 스케줄링 | APScheduler | API 프로세스 내 cron |
+| 품질 | ruff, ty, pytest | GitHub Actions CI |
 
-## 🚀 Key Features
+## 🚀 Quick Start
 
-1. **Automated Data Pipeline**
-   - Apache Airflow와 Spark를 활용하여 채용 공고 데이터를 수집(Bronze), 정제(Silver), 벡터화(Gold)하는 ETL 파이프라인을 구축했습니다.
-   - 초기 Streaming 아키텍처에서 안정적인 데이터 적재를 위해 Batch 방식으로 최적화되었습니다.
+```bash
+cp .env.example .env          # GOOGLE_API_KEY 입력
+make up                       # postgres + api 빌드/기동 (마이그레이션·시드 자동)
+make pipeline                 # 전체 파이프라인 실행 (수집→정제→임베딩)
+# 최초 1회는 e5-large 모델(~2.2GB)을 /data/models에 다운로드합니다
+# 이후 브라우저에서 http://localhost:8000 접속 → 프로필 선택 → 추천/분석
+# 관리자 화면: http://localhost:8000/admin (현황 대시보드·파이프라인 실행·데이터/인재/캐시 관리)
+```
 
-2. **Semantic Search (Vector Search)**
-   - Qdrant 벡터 데이터베이스와 **KoSimCSE** 임베딩 모델을 사용하여, 단순 키워드 매칭이 아닌 문맥 기반의 직무 적합성 검색을 수행합니다.
+로컬 개발 (컨테이너 DB만 띄우고 코드는 호스트에서):
 
-3. **RAG Based Consulting**
-   - **Google Gemini 3 Flash** 모델을 활용하여, 검색된 공고와 사용자 프로필을 비교 분석합니다.
-   - 부족한 역량에 대한 점수화(Scoring) 및 구체적인 학습 로드맵(Gap Analysis)을 제공합니다.
+```bash
+docker compose up -d postgres
+uv sync
+uv run mentoai migrate && uv run mentoai seed
+uv run mentoai pipeline
+uv run mentoai serve --reload
+```
 
-## 🏗️ System Architecture (Medallion Architecture)
+### CLI
 
-데이터는 Bronze, Silver, Gold 단계를 거치며 점진적으로 가공되어 서비스에 활용됩니다.
-
-1. **Ingestion (Kafka)**: `producer_wanted.py`를 통해 공고 수집 후 `career_raw` 토픽으로 전송
-2. **Bronze Layer (S3)**: 원본 JSON 데이터를 Parquet 형식으로 보존 (Data Lake)
-3. **Silver Layer (PostgreSQL)**: Spark를 이용한 데이터 정제(HTML 제거, 스키마 검증) 및 RDBMS 적재
-4. **Gold Layer (Qdrant)**: KoSimCSE 모델로 공고 본문 임베딩 후 벡터 DB 인덱싱
-5. **Orchestration (Airflow)**: Docker-out-of-Docker 구조로 전체 파이프라인 스케줄링
-6. **Service Layer (FastAPI)**: 사용자 요청 처리 및 RAG(Retrieval-Augmented Generation) 수행
-
-## 📂 Project Structure
-
-MENTOAI_DE/
-├── dags/                       # Airflow DAG
-│   └── mentoai_pipeline.py     # [Main] Kafka -> Bronze -> Silver -> Gold 통합 파이프라인
-├── kafka/                      # 데이터 수집 모듈
-│   ├── producer_wanted.py      # [Main] 실시간 공고 수집기
-│   └── utils/
-│       └── wanted_scraper.py   # 원티드 공고 크롤링 로직
-├── spark/                      # 데이터 처리 모듈
-│   ├── job_ingest_bronze.py    # Task 1: Kafka -> S3 (Parquet)
-│   ├── job_process_silver.py   # Task 2: S3 -> Postgres (Data Cleaning)
-│   ├── job_upsert_gold.py      # Task 3: Postgres -> Qdrant (Embedding)
-│   └── utils/
-│       ├── spark_session.py    # Spark 세션 생성 헬퍼
-│       ├── text_cleaner.py     # 텍스트 전처리 유틸
-│       └── writers.py          # DB/S3 적재 함수
-├── server/                     # Backend API & AI Engine
-│   ├── app/
-│   │   └── main.py             # FastAPI 엔드포인트 & RAG 로직 (LangChain)
-│   ├── Dockerfile
-│   └── requirements.txt
-├── infra/                      # 인프라 설정 (Docker)
-│   ├── airflow/                # Airflow 빌드 설정
-│   ├── spark/                  # Spark 빌드 설정
-│   └── docker-compose.yml      # 전체 서비스 오케스트레이션
-├── .env                        # 환경 변수 (AWS Key, Gemini Key, DB Info)
-└── README.md                   # 본 문서
+```
+mentoai migrate     # 마이그레이션 적용
+mentoai seed        # 샘플 사용자 적재 (멱등)
+mentoai status      # DB 현황·모델·스케줄·최근 실행 요약
+mentoai scrape      # Bronze: 수집 → raw_postings
+mentoai transform   # Silver: 정제 → jobs
+mentoai embed       # Gold: 임베딩 (--force 전량 재계산)
+mentoai pipeline    # 전체 실행 (pipeline_runs에 이력 기록)
+mentoai jobs list/rm    # 공고 조회/삭제 (원본·임베딩·캐시 함께)
+mentoai users list/set/rm   # 인재 조회/등록·수정/삭제
+mentoai models      # 임베딩 모델 목록
+mentoai switch-embedding   # 임베딩 모델 전환
+mentoai serve       # API 서버
+```
 
 ## 📡 API Endpoints
 
 ### 1. 기업 목록 추천
-* **POST** `/api/v3/jobs/recommend/{user_id}`
-* 사용자의 프로필(기술, 경력)과 가장 유사한 공고 5개를 추천하고, 적합도 점수를 반환합니다.
+* **POST** `/api/v1/jobs/recommend/{user_id}`
+* pgvector 유사도 검색 + 기술스택/경력 휴리스틱으로 상위 N개 공고와 적합도 점수를 **즉시(LLM 호출 없이)** 반환.
 
 ### 2. 상세 커리어 컨설팅
-* **POST** `/api/v3/jobs/{job_id}/analyze/{user_id}`
-* 특정 공고에 대해 합격을 위한 구체적인 전략(부족한 점, 액션 플랜, 면접 팁)을 JSON 형태로 제공합니다.
+* **POST** `/api/v1/jobs/{job_id}/analyze/{user_id}`
+* Gemini가 부족한 역량·액션 플랜·면접 팁을 구조화된 JSON으로 제공.
+* 동일 (공고, 사용자, 모델) 조합은 `analysis_cache` 테이블에 캐시되어 **Gemini 호출 1회만** 발생.
 
-## ⚡ Prerequisites
+### 3. 관리자 (`/admin` 페이지 + `/api/v1/admin/*`, CLI와 같은 로직 공유)
+* 현황 대시보드(카운트·테이블 용량·모델·스케줄 다음 실행·진행 중 작업)
+* 파이프라인 즉시 실행(백그라운드, 중복 409) + 실행 이력
+* 공고 검색·삭제, 인재 등록/수정/삭제, 분석 캐시 관리
+* 임베딩 운영: 모델 목록 조회·전환(백그라운드)·전량 재계산 (`mentoai status/jobs/users/embed --force`와 동일 기능)
+* 데모용이라 인증이 없으므로 실서비스 노출 시 게이트웨이 인증 등 보호 필요
 
-이 프로젝트를 실행하기 위해 필요한 요구사항입니다.
+## 📂 Project Structure
 
-* Docker & Docker Compose
-* Python 3.9+
-* API Keys:
-    * Google Gemini API Key
-    * AWS Access Key (S3 접근용)
-
----
-
-## ⚡ Quick Start
-
-### 1. 환경 설정 (Prerequisites)
-프로젝트 루트에 `.env` 파일을 생성하고 필요한 API 키를 입력합니다.
-(GOOGLE_API_KEY, AWS_ACCESS_KEY_ID, POSTGRES_USER, QDRANT_HOST 등)
-
-### 2. 인프라 빌드 및 실행
-각 서비스(Airflow, Spark, Server)를 개별 Dockerfile로 빌드하여 실행합니다.
-
-cd infra
-docker compose up -d --build
-
-### 3. 데이터 파이프라인 실행
-Airflow 웹 UI에 접속하여 파이프라인을 활성화합니다.
-* **URL**: http://localhost:8081
-* **Account**: admin / admin
-* **Action**: `mentoai_pipeline` DAG를 Unpause(ON) 하고 Trigger 실행
-
-### 4. API 서비스 사용
-FastAPI Swagger UI를 통해 추천 및 컨설팅 API를 테스트할 수 있습니다.
-* **URL**: http://localhost:8000/docs
-
-## 🚀 Installation & Execution Guide
-
-### 1. 환경 변수 설정
-프로젝트 루트 디렉토리에 .env 파일을 생성하고 아래 내용을 채워주세요.
-
-# .env 예시
-GOOGLE_API_KEY=your_gemini_key
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-S3_BUCKET_NAME=mentoai-career-raw
-DATABASE_URL=postgresql://airflow:airflow@postgres:5432/mentoai
-QDRANT_HOST=mentoai-qdrant
-
-### 2. 인프라 빌드 및 실행
-infra 디렉토리로 이동하여 모든 서비스를 실행합니다.
-
-cd infra
-/ docker compose up -d --build
-
-### 3. 데이터베이스 초기화 (User Data)
-PostgreSQL 컨테이너에 접속하여 사용자 테이블을 생성하고 테스트 데이터를 입력합니다.
-
-# Postgres 접속
-/ docker exec -it mentoai-postgres psql -U airflow -d mentoai
-
-# 테이블 생성 SQL 실행
-/ CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-/ CREATE TABLE IF NOT EXISTS user_specs (
-    spec_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    desired_job VARCHAR(100),
-    career_years INT DEFAULT 0,
-    education VARCHAR(100),
-    skills TEXT[],
-    certificates TEXT[],
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-# 테스트 데이터 입력
-/ INSERT INTO users (username, email) VALUES ('강태영', 'tang0923@khu.ac.kr');
-
-/ INSERT INTO user_specs (user_id, desired_job, career_years, education, skills, certificates) 
-VALUES (1, 'Data Engineer', 0, '학사', ARRAY['Python', 'Spark', 'Kafka', 'Airflow'], ARRAY['정보처리기사', 'SQLD']);
-
-# 입력 후 \q 로 종료
-
-### 4. 데이터 파이프라인 실행 (Airflow)
-1. 웹 브라우저에서 http://localhost:8081 접속
-2. 로그인: admin / admin
-3. mentoai_pipeline DAG를 찾아서 왼쪽의 Toggle을 ON으로 변경
-4. 우측의 'Trigger DAG' 버튼 클릭
-5. Graph View에서 Kafka -> Bronze -> Silver -> Gold 작업이 모두 Success로 변하는지 확인
-
-### 5. API 테스트
-파이프라인이 완료되면 RAG 서버가 준비됩니다. http://localhost:8000/docs 에 접속하거나 아래 명령어로 테스트하세요.
-
-# 1. 기업 추천 목록 조회 (V3)
-/ curl -X 'POST' 'http://localhost:8000/api/v3/jobs/recommend/1' -H 'accept: application/json' -d ''
-
-# 2. 특정 기업 상세 컨설팅 (job_id는 위 응답에서 확인)
-/ curl -X 'POST' 'http://localhost:8000/api/v3/jobs/{JOB_ID}/analyze/1' -H 'accept: application/json' -d ''
-
----
-
-## 🛠️ Tech Stack Details
-
-**Infrastructure**
-* Docker Compose: 마이크로서비스(Airflow, Spark, DB, Server) 통합 관리
-
-**Data Engineering**
-* Kafka: 실시간 공고 데이터 버퍼링
-* Spark (PySpark): 대용량 데이터 전처리 및 벡터화 (Batch Processing)
-* Airflow: 데이터 파이프라인 의존성 관리 및 스케줄링
-
-**Storage**
-* PostgreSQL: 정형 데이터(사용자 정보, 정제된 공고) 저장
-* Qdrant: 공고 텍스트 임베딩 벡터 저장 및 유사도 검색
-* AWS S3: Raw Data(JSON/Parquet) 영구 보관 (Data Lake)
-
-**AI & Backend**
-* FastAPI: 비동기 API 서버
-* LangChain: LLM 프롬프트 체이닝 및 Output Parsing
-* Google Gemini 3 Flash: 추론 및 로드맵 생성
-* KoSimCSE: 한국어 특화 문장 임베딩 모델
-
----
-
-## 🧪 Development Quality Tools (uv / ruff / ty)
-
-프로젝트 루트에서 아래 명령으로 개발 품질 검사를 수행할 수 있습니다.
-
-```bash
-# 의존성 동기화
-uv sync
-
-# 린트 검사
-uv run ruff check server tests
-
-# 타입 검사
-uv run ty check server
-
-# 테스트 실행
-uv run pytest
+```
+mentoai_de/
+├── compose.yaml               # postgres + api (2 서비스)
+├── Dockerfile                 # uv 멀티스테이지 단일 이미지 (~300MB, PyTorch 없음)
+├── src/mentoai/
+│   ├── config.py              # pydantic-settings (.env)
+│   ├── db/                    # asyncpg 풀 + pgvector 코덱 + SQL 마이그레이션 러너
+│   ├── migrations/            # 001_init.sql (bronze/silver 스키마 + HNSW 인덱스)
+│   ├── scrapers/              # wanted.py / work24.py (비동기 httpx)
+│   ├── pipeline/              # bronze / silver(Polars) / gold(fastembed) / runner
+│   ├── ai/                    # embeddings / gemini / recommend / analyzer / scoring
+│   ├── api/                   # FastAPI 앱 + routes + APScheduler
+│   ├── static/                # 모놀리식 UI (index/app + admin 페이지, 빌드 도구 없음)
+│   └── cli.py                 # Typer CLI (uv run mentoai)
+└── tests/                     # 정제·스코어링·API 단위 테스트 (DB 불필요)
 ```
 
----
+## 🔎 임베딩 모델 선택 기록
 
-## ⚠️ Troubleshooting (Project History)
+v2의 KoSimCSE-roberta(2022, 768차원, korSTS 용 SimCSE)는 검색(retrieval) 목적 학습이 아니라는 한계가 있었다. 후보 비교 결과:
 
-### 1. Airflow RBAC 권한 오류 (Access Denied)
-* **현상**: DB 초기화 후 웹 UI 접속 시 'Admin' 역할이 없어 대시보드 접근 불가.
-* **원인**: docker-compose down으로 인한 DB 휘발 및 자동 초기화 스크립트 재실행 실패.
-* **해결**: 컨테이너 내부에서 `airflow users create` 명령어로 관리자 계정 수동 생성 및 권한 부여.
+| 모델 | 차원 | 라이선스 | 비고 |
+|---|---|---|---|
+| BM-K/KoSimCSE-roberta (기존) | 768 | MIT | korSTS 강점, 검색 용도로는 구식 |
+| **intfloat/multilingual-e5-large (기본)** | 1024 | MIT | 검색 학습된 다국어 모델, fastembed 네이티브 지원, PyTorch 불필요 |
+| gemini-embedding-001 (옵션) | 1024 (조절) | API | MTEB 다국어 최상위권. `EMBEDDING_PROVIDER=gemini`로 전환 |
+| jina-embeddings-v3 | 1024 | **CC-BY-NC** | 상용 서비스에 부적합해 제외 |
+| BAAI/bge-m3 | 1024 | MIT | fastembed 0.8 지원 목록에 없음 (bge-m3 기반 KURE-v1은 한국어 검색 SOTA지만 ONNX 미제공) |
+| nlpai-lab/KURE-v1 | 1024 | MIT | 한국어 검색 SOTA(bge-m3 파인튜닝). ONNX 직접 export 시 fastembed 대체 가능 — 향후 업그레이드 경로 |
 
-### 2. PostgreSQL 데이터 휘발 및 볼륨 이슈
-* **현상**: 컨테이너를 내렸다 올리면 DB에 생성한 테이블과 유저 데이터가 사라짐.
-* **원인**: Docker 볼륨 매핑 누락으로 데이터가 영구 저장되지 않음.
-* **해결**: docker-compose.yml의 postgres 서비스에 `./postgres_data:/var/lib/postgresql/data` 매핑 추가.
+모델 전환은 CLI 한 방이다 (`.env`는 자동 백업 후 갱신, 임베딩 테이블은 차원에 맞게 재생성되고 전량 재임베딩된다):
 
-### 3. Spark Streaming 적재 누락 (Fake Success)
-* **현상**: Airflow 태스크는 성공으로 뜨지만 Postgres에 테이블이 생성되지 않음.
-* **원인**: `writeStream` 사용 시 `awaitTermination()` 설정 부재로 적재 완료 전 세션 종료.
-* **해결**: 유실 데이터 복구를 위해 S3 데이터를 몽땅 읽어 처리하는 **Batch Recovery 모드** 도입 및 테이블 강제 생성.
+```bash
+mentoai models                                  # 사용 가능한 모델 목록 + 현재 선택
+mentoai switch-embedding --provider gemini --yes  # 로컬 → Gemini API
+mentoai switch-embedding --provider fastembed \
+  --model intfloat/multilingual-e5-large --yes    # 다시 로컬로
+```
 
-### 4. Qdrant 메타데이터 "미상" 출력 이슈
-* **현상**: 추천 목록 API 응답에서 기업명과 공고명이 "미상"으로 나옴.
-* **원인**: LangChain의 `vector_store`가 Qdrant의 특정 페이로드 필드를 읽어오지 못하는 호환성 문제.
-* **해결**: Qdrant Raw Client를 사용하여 검색된 ID로 직접 포인트(Point)를 조회(`retrieve`)하여 페이로드를 확실하게 가져오도록 보정.
+차원이 같은 전환이라 테이블 재생성이 필요 없더라도, 파이프라인의 gold 단계가 임베딩의 `model` 컬럼(provider 포함 식별자)을 검사해 **모델이 바뀌면 자동으로 재임베딩**한다. 즉 `.env`만 고치고 `mentoai pipeline`을 돌려도 안전하다.
 
-### 5. Gemini JSON Parsing 에러 (Output Parser)
-* **현상**: V3 목록 조회 시 500 Internal Server Error 발생.
-* **원인**: `JsonOutputParser`가 `List[JobSummary]` 형태를 직접 처리하지 못함.
-* **해결**: 리스트를 감싸는 래퍼 클래스(`JobSummaryList`)를 정의하여 파서에게 전달함으로써 스키마 정합성 확보.
+## 📈 Why not Kafka/Spark/Airflow? (확장 설계서)
 
-### 6. QdrantClient 버전 호환성 (search vs retrieve)
-* **현상**: `client.search()` 호출 시 속성이 없다는 에러 발생.
-* **원인**: 설치된 `qdrant-client` 라이브러리 버전이 낮아 최신 메서드 미지원.
-* **해결**: 버전 의존성이 없는 `vector_store.similarity_search`로 ID를 먼저 찾고, 구버전에서도 지원하는 `client.retrieve`로 데이터를 가져오는 하이브리드 방식 적용.
+하루 수백 건 규모의 공고 데이터에 분산 스택은 순수 오버엔지니어링입니다. 각 기술의 재도입 시점을 명시해 둡니다.
 
-### 7. 채점 인플레이션 (Scoring Calibration)
-* **현상**: 사용자의 경력이 부족함에도 모든 공고에 90점 이상의 높은 점수가 부여됨.
-* **원인**: 프롬프트의 채점 기준이 너무 관대함.
-* **해결**: 프롬프트에 **"냉정한 IT 면접관"** 페르소나를 부여하고, 연차 미달 시 감점 조건을 명시하여 60~85점 사이의 현실적인 점수가 나오도록 조정.
+| 신호 | 도입 기술 | 마이그레이션 경로 |
+|---|---|---|
+| 수집 소스 10개+ · 실시간성 요구 | Kafka/Redpanda | 스크래퍼 → producer 전환, consumer가 bronze에 적재 (bronze 인터페이스 불변) |
+| 일일 수백만 건 | Spark/Flink | silver 변환만 교체 (normalize 함수 순수 → UDF 포팅 용이) |
+| 파이프라인 20+ 태스크 · SLA 추적 | Airflow 3 / Dagster | runner.run_pipeline를 태스크로 래핑 (단계별 모듈이 이미 분리됨) |
+| 벡터 수억 개 · 하이브리드 검색 | Qdrant | job_embeddings 테이블 → Qdrant 컬렉션 이관 (recommend 모듈만 교체) |
 
-
-
-
-
-[ Data Ingestion ]       [ Data Lake / Warehouse ]       [ AI Serving Layer ]
-      (Bronze)                  (Silver / Gold)               (RAG Engine)
-
-  +--------------+          +------------------+          +------------------+
-  | Job Source   |          |  AWS S3 (Raw)    |          |  FastAPI Server  |
-  | (Wanted API) |          |  [Bronze Layer]  |          |  (LangChain/RAG) |
-  +--------------+          +------------------+          +------------------+
-         |                          ^                             ^
-      (Consume)                     |                             |
-         v                   (Scheduled Batch)             (Vector Search)
-  +--------------+          +------------------+          +------------------+
-  | Kafka Cluster| --------> |  Spark Cluster   | -------> |    Qdrant DB     |
-  | (Streaming)  |          |  (Clean/Embed)   |          |   [Gold Layer]   |
-  +--------------+          +------------------+          +------------------+
-                                    |                             ^
-                             (Save Standard)                      |
-                                    v                             |
-                            +------------------+                  |
-                            |    Postgres      | -----------------+
-                            |  [Silver Layer]  |
-                            +------------------+
-
-[ Orchestration: Apache Airflow (Docker-out-of-Docker) ]
+모든 계층이 인터페이스(scraper→bronze→silver→gold→API)로 분리되어 있어, 위 전환은 각각 한 모듈 교체로 끝납니다.
