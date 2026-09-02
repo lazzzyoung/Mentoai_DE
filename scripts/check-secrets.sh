@@ -12,20 +12,27 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck disable=SC2034  # lib.sh step()에서 사용
+STEP_TOTAL=3
+title "시크릿 유출 검사 (3가지)"
 
 FAILED=0
-fail() { printf '\033[1;31m[시크릿 검사] 유출 징후:\033[0m %s\n' "$*"; FAILED=1; }
-info() { printf '\033[1;36m[시크릿 검사]\033[0m %s\n' "$*"; }
+fail() { err "$*"; FAILED=1; }
 
-# --- 검사 1) .env 계열 추적 여부 (.env.example 템플릿은 추적 허용) ---
+# --- [1/3] .env 계열 추적 여부 (.env.example 템플릿은 추적 허용) ---
+step ".env 파일이 git에 올라가 있지 않은지"
 tracked_env=$(git ls-files -- '.env' '.env.*' '*.env' '*/*.env' '*/*.env.*' 2>/dev/null | grep -v '^\.env\.example$')
 if [[ -n $tracked_env ]]; then
-  fail "다음 .env 계열 파일이 git에 추적된다: $tracked_env (git rm --cached 로 제거 필요)"
+  fail "이 파일들이 git에 추적되고 있습니다: $tracked_env"
+  hint "git rm --cached '파일명' 으로 추적을 제거하세요. 값이 이미 push됐다면 해당 키를 반드시 재발급하세요."
 else
-  info ".env 계열 미추적 확인 (.env.example 템플릿 제외)"
+  ok "추적 없음 — .env.example 템플릿만 저장소에 있습니다"
 fi
 
-# --- 검사 2) 추적 파일 패턴 스캔 (.env.example도 대상 — 실제 값이면 적발된다) ---
+# --- [2/3] 추적 파일 패턴 스캔 (.env.example도 대상 — 실제 값이면 적발된다) ---
+step "알려진 키/토큰 패턴 스캔 (8종)"
 PATTERNS=(
   'AIza[0-9A-Za-z_-]{30,}'                                # Google API 키
   'AKIA[0-9A-Z]{16}'                                      # AWS 액세스 키
@@ -38,50 +45,50 @@ PATTERNS=(
 )
 for pat in "${PATTERNS[@]}"; do
   if git grep -nIE -- "$pat" -- . >/dev/null 2>&1; then
-    fail "패턴 유출 정황 ($(git grep -nIE -- "$pat" -- . | head -3 | tr '\n' ' '))"
+    fail "키/토큰 패턴 발견:"
+    git grep -nIE -- "$pat" -- . | head -3 | sed 's/^/      /'
+    hint "해당 줄을 삭제하고 값은 .env에 넣으세요 (코드에서는 환경변수로 읽습니다)"
   fi
 done
-info "추적 파일 패턴 스캔 완료 (${#PATTERNS[@]}종)"
+ok "8종 패턴 이상 없음"
 
-# --- 검사 3) 로컬 .env 실제 값이 코드·산출물에 새었는지 ---
+# --- [3/3] 로컬 .env 실제 값이 코드·산출물에 새었는지 ---
+step ".env의 실제 값이 코드·바이너리에 없는지"
 scan_file_for_values() {
-  local file=$1 values_hit=0 key value
+  local file=$1 key value
   [[ -f $file ]] || return 0
-  while IFS='=' read -r key value; do
+  while IFS='=' read -r key value <&3; do
     value=${value%\"}; value=${value#\"}; value=${value%\'}; value=${value#\'}
     [[ -n $value && ${#value} -ge 20 ]] || continue
     case $key in
       *SECRET*|*TOKEN*|*PASSWORD*|*API_KEY*|*DSN*) ;;
       *) continue ;;
     esac
-    # git 추적 파일에서 값 검색
     if git grep -qF -- "$value" -- . 2>/dev/null; then
-      fail "[$key] 값이 git 추적 파일에 존재: $(git grep -lF -- "$value" -- . | head -2 | tr '\n' ' ')"
-      values_hit=1
+      fail "[$key] 값이 코드에 하드코딩되어 있습니다: $(git grep -lF -- "$value" -- . | head -2 | tr '\n' ' ')"
+      hint "그 줄에서 값을 지우고 os.Getenv로 읽으세요. 이미 push했다면 키를 재발급하세요."
     fi
-    # 빌드 산출물(바이너리)에서 값 검색 — 시크릿은 런타임 env에서만 와야 한다
     for artifact in bin/* dist/*; do
       if [[ -f $artifact ]] && grep -qaF -- "$value" "$artifact" 2>/dev/null; then
-        fail "[$key] 값이 빌드 산출물에 포함됨: $artifact"
-        values_hit=1
+        fail "[$key] 값이 빌드 산출물에 포함되어 있습니다: $artifact"
+        hint "산출물에 값이 새지 않습니다 — 소스에서 제거한 뒤 다시 빌드하세요."
       fi
     done
-  done < "$file"
-  return $values_hit
+  done 3< "$file"
 }
 
 if [[ -f .env ]]; then
-  if scan_file_for_values .env; then
-    info ".env 실제 값 미새출 확인 (코드·바이너리)"
-  fi
+  scan_file_for_values .env
+  ok ".env의 시크릿이 코드·바이너리에 없습니다"
 else
-  info ".env 없음 — 값 검사 생략"
+  skip ".env가 없어 값 검사는 생략합니다"
 fi
 
 # --- 결과 ---
 if [[ $FAILED -eq 1 ]]; then
-  printf '\033[1;31m[시크릿 검사] 실패 — 배포/커밋을 중단합니다.\033[0m\n' >&2
+  err "시크릿 검사를 통과하지 못했습니다 — 배포/커밋이 중단되었습니다"
+  hint "위 안내대로 수정한 뒤 'make check-secrets'로 다시 확인하세요"
   exit 1
 fi
-printf '\033[1;32m[시크릿 검사] 통과\033[0m\n'
+ok "시크릿 검사 통과 — 안심하고 배포하셔도 됩니다"
 exit 0
