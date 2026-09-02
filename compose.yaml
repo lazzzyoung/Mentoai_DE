@@ -1,21 +1,6 @@
+# Go 단일 바이너리 + 내장 SQLite: 외부 서비스 컨테이너가 없다.
+# API 서버 하나만 띄우면 전체 스택이다 (시작 시 마이그레이션 자동 적용).
 services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: mentoai-postgres
-    environment:
-      POSTGRES_USER: mentoai
-      POSTGRES_PASSWORD: mentoai
-      POSTGRES_DB: mentoai
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mentoai -d mentoai"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   api:
     build: .
     container_name: mentoai-api
@@ -23,18 +8,12 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql://mentoai:mentoai@postgres:5432/mentoai
+      SQLITE_PATH: /data/mentoai.db
       SCHEDULE_ENABLED: "true"
-      EMBEDDING_CACHE_DIR: /data/models
     ports:
       - "8000:8000"
     volumes:
-      - models:/data/models
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: sh -c "mentoai migrate && mentoai seed && uvicorn mentoai.api.main:app --host 0.0.0.0 --port 8000"
+      - data:/data
 
 volumes:
-  pgdata:
-  models:
+  data:

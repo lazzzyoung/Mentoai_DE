@@ -1,27 +1,18 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
-WORKDIR /app
+# syntax=docker/dockerfile:1
+# CGO 없이 정적 빌드 → 실행 이미지는 distroless의 단일 바이너리.
 
-COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-install-project --no-dev
+FROM golang:1.27-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -o /out/mentoai ./cmd/mentoai
 
-COPY src ./src
-COPY README.md ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
-
-FROM python:3.12-slim-bookworm
-RUN useradd --create-home appuser
-WORKDIR /app
-
-COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/src /app/src
-
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    EMBEDDING_CACHE_DIR=/data/models
-
-USER appuser
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/mentoai /mentoai
+ENV SQLITE_PATH=/data/mentoai.db
+VOLUME ["/data"]
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
-
-CMD ["uvicorn", "mentoai.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# serve는 시작 시 마이그레이션을 자동 적용한다 (tzdata는 바이너리에 포함).
+ENTRYPOINT ["/mentoai"]
+CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]

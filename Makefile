@@ -1,4 +1,42 @@
-.PHONY: up down logs ps migrate seed pipeline test lint fmt check
+BINARY := bin/mentoai
+
+.PHONY: build run test lint fmt check tidy clean migrate seed pipeline up down logs
+
+build:
+	go build -ldflags "-s -w" -o $(BINARY) ./cmd/mentoai
+
+run: build
+	$(BINARY) serve
+
+test:
+	go test ./...
+
+lint:
+	go vet ./...
+
+fmt:
+	gofmt -w cmd internal
+
+check: lint test
+
+tidy:
+	go mod tidy
+
+clean:
+	rm -rf bin data
+
+# --- 파이프라인 편의 명령 ---
+
+migrate: build
+	$(BINARY) migrate
+
+seed: build
+	$(BINARY) seed
+
+pipeline: build
+	$(BINARY) pipeline
+
+# --- Docker ---
 
 up:
 	docker compose up -d --build
@@ -8,28 +46,3 @@ down:
 
 logs:
 	docker compose logs -f api
-
-ps:
-	docker compose ps
-
-migrate:
-	uv run mentoai migrate
-
-seed:
-	uv run mentoai seed
-
-pipeline:
-	uv run mentoai pipeline
-
-test:
-	uv run pytest -q
-
-lint:
-	uv run ruff check src tests
-
-fmt:
-	uv run ruff format src tests && uv run ruff check --fix src tests
-
-check: lint
-	uv run ty check src
-	uv run pytest -q
