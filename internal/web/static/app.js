@@ -190,6 +190,60 @@ async function analyze(postingEl) {
 $("#recommend-btn").addEventListener("click", recommend);
 loadUsers();
 
+/* ---------- 로그인 (구글/앱인토스 — 서버 설정이 켜져 있을 때만 표시) ---------- */
+
+async function loadAuth() {
+  const area = $("#auth-area");
+  if (!area) return;
+
+  let me = null;
+  try { me = await api("/api/v1/auth/me"); } catch { /* 미로그인 */ }
+  if (me) {
+    area.innerHTML =
+      `<b>${esc(me.username)}</b>님 <span class="bar">ㅣ</span>` +
+      `<a href="#" class="util-link" id="logout-link">로그아웃</a>`;
+    $("#logout-link").addEventListener("click", async (e) => {
+      e.preventDefault();
+      try { await api("/api/v1/auth/logout", { method: "POST" }); } catch { /* 이미 만료 */ }
+      loadAuth();
+    });
+    return;
+  }
+
+  try {
+    const status = await api("/api/v1/auth/status");
+    const links = [];
+    for (const p of status.providers || []) {
+      if (!p.enabled) continue;
+      if (p.login_path) {
+        links.push(`<a class="util-link" href="${esc(p.login_path)}">구글로 로그인</a>`);
+      } else if (p.provider === "toss" && typeof window.appLogin === "function") {
+        // 앱인토스 웹뷰 안에서만 SDK(appLogin)가 존재한다
+        links.push(`<a href="#" class="util-link" id="toss-login">토스로 로그인</a>`);
+      }
+    }
+    if (links.length) area.innerHTML = links.join('<span class="bar">ㅣ</span>');
+  } catch { /* status 조회 실패 시 기본 링크 유지 */ }
+
+  const tossBtn = $("#toss-login");
+  if (tossBtn) {
+    tossBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const { authorizationCode, referrer } = await window.appLogin();
+        await api("/api/v1/auth/toss/callback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ authorizationCode, referrer }),
+        });
+        loadAuth();
+      } catch (err) { alert(`토스 로그인 실패 — ${err.message}`); }
+    });
+  }
+}
+
+loadAuth();
+
 /* ---------- PWA ---------- */
 
 if ("serviceWorker" in navigator) {

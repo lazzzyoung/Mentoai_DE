@@ -27,6 +27,7 @@ type Storage struct {
 	Embeddings *Embeddings
 	Cache      *Cache
 	Runs       *Runs
+	Identities *Identities
 }
 
 // Open은 SQLite 파일을 열고 PRAGMA를 설정한다. :memory:는 테스트용 임시 DB다.
@@ -50,6 +51,7 @@ func Open(path string) (*Storage, error) {
 		Embeddings: newEmbeddings(db),
 		Cache:      &Cache{db: db},
 		Runs:       &Runs{db: db},
+		Identities: &Identities{db: db},
 	}
 	return s, nil
 }

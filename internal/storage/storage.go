@@ -69,6 +69,13 @@ type RunRepo interface {
 	HasRunning(ctx context.Context) (bool, error)
 }
 
+// IdentityRepo는 외부 로그인 신원(구글 sub, 토스 userKey 등)과
+// 서비스 사용자의 매핑을 담당한다.
+type IdentityRepo interface {
+	FindUserID(ctx context.Context, provider, providerUserID string) (*int64, error)
+	Link(ctx context.Context, provider, providerUserID string, userID int64) error
+}
+
 // SizeProbe는 테이블 용량 조회다. SQLite dbstat 등 구현 의존 기능을 감싼다.
 type SizeProbe interface {
 	TableSizes(ctx context.Context) (bronze, jobs, embeddings int64, err error)

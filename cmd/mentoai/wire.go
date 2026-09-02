@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Chae-JS/mentoai/internal/analysis"
 	"github.com/Chae-JS/mentoai/internal/api"
+	"github.com/Chae-JS/mentoai/internal/auth"
+	authgoogle "github.com/Chae-JS/mentoai/internal/auth/google"
+	authtoss "github.com/Chae-JS/mentoai/internal/auth/toss"
 	"github.com/Chae-JS/mentoai/internal/config"
 	"github.com/Chae-JS/mentoai/internal/domain"
 	"github.com/Chae-JS/mentoai/internal/embedding"
@@ -123,13 +127,44 @@ func Wire(settings config.Settings) (*App, error) {
 	opsService := ops.New(holder, store.Users, store.Raw, store.Jobs, store.Embeddings,
 		store.Cache, store.Runs, store, registry, active, runner, sched)
 
+	// --- 인증: 설정이 채워진 공급자만 활성화된다 (기본 OFF) ---
+	var providers []auth.Provider
+	providers = append(providers, authgoogle.New(authgoogle.Config{
+		ClientID:     settings.GoogleClientID,
+		ClientSecret: settings.GoogleClientSecret,
+		RedirectURL:  settings.GoogleRedirectURL,
+	}))
+	tossProvider, err := authtoss.New(authtoss.Config{
+		BaseURL:  settings.TossAPIBaseURL,
+		CertPath: settings.TossMTLSCertPath,
+		KeyPath:  settings.TossMTLSKeyPath,
+	})
+	if err != nil {
+		_ = store.Close()
+		return nil, err
+	}
+	providers = append(providers, tossProvider)
+
+	anyProvider := false
+	for _, p := range providers {
+		if p.Enabled() {
+			anyProvider = true
+		}
+	}
+	if anyProvider && settings.AuthSecret == "" {
+		_ = store.Close()
+		return nil, fmt.Errorf("로그인 공급자가 설정되어 있으면 AUTH_SECRET(세션 서명 키)도 설정해야 합니다")
+	}
+	sessions := auth.NewSessionManager(settings.AuthSecret, 30*24*time.Hour, settings.AuthCookieSecure)
+	authService := auth.NewService(providers, sessions, store.Users, store.Identities)
+
 	return &App{
 		Settings: settings,
 		Holder:   holder,
 		Store:    store,
 		Ops:      opsService,
 		Active:   active,
-		Server:   api.New(store.Users, rec, ana, opsService),
+		Server:   api.New(store.Users, rec, ana, opsService, authService, settings.AuthRequired),
 		Schedule: sched,
 		Pipeline: runner,
 	}, nil

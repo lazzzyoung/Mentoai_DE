@@ -88,7 +88,15 @@ mentoai switch-embedding --provider gemini --yes   # 임베딩 모델 전환
 * 파이프라인 즉시 실행(백그라운드, 중복 409) + 실행 이력
 * 공고 검색·삭제, 인재 등록/수정/삭제, 분석 캐시 관리
 * 임베딩 운영: 모델 목록 조회·전환(백그라운드)·전량 재계산
-* 데모용이라 인증이 없으므로 실서비스 노출 시 게이트웨이 인증 등 보호 필요
+* 데모 기본값은 무인증이며, 아래 로그인을 켜고 `AUTH_REQUIRED=true`로 보호 가능
+
+### 4. 로그인 (구글 / 앱인토스 — 설정만으로 켜진다)
+* **기본 완전 OFF**: 관련 env가 비어 있으면 기존과 동일하게 무인증으로 동작.
+* **구글**: 표준 OAuth2. `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`(콘솔에 `GOOGLE_REDIRECT_URL` 등록)만 넣으면 상단 "구글로 로그인" 버튼이 활성화된다. 첫 로그인 시 자동 회원가입(users+user_specs 생성) 후 세션 쿠키 발급.
+* **앱인토스**: 클라이언트 SDK(`@apps-in-toss/web-framework`의 `appLogin()`)가 받은 인가 코드를 `POST /api/v1/auth/toss/callback`으로 보내면 서버가 `generate-token`(mTLS 필수, `TOSS_MTLS_CERT_PATH`/`TOSS_MTLS_KEY_PATH`) → `login-me`로 `userKey`를 조회해 로그인 처리.
+* 세션은 DB 없는 HMAC 서명 토큰(`AUTH_SECRET` 필요) — 쿠키(HttpOnly)와 `Authorization: Bearer` 모두 지원, 30일 유효.
+* `AUTH_REQUIRED=true`면 `/api/v1/admin/*`와 `/api/v1/jobs/*`(Gemini 비용 보호)에 401 게이트. `/api/v1/users`·static은 항상 개방.
+* 로그인 사용자는 `GET/PUT /api/v1/auth/me`로 자기 스펙(직무/경력/스킬)을 직접 관리하고 맞춤 추천을 받는다.
 
 ## 📂 Project Structure
 

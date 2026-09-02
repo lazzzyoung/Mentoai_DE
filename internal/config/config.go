@@ -36,6 +36,17 @@ type Settings struct {
 	ScheduleTimezone string
 
 	RecommendTopK int
+
+	// --- 인증 (값이 채워진 공급자만 활성화된다) ---
+	AuthSecret         string // 세션 서명 키 (로그인 기능 마스터 스위치)
+	AuthRequired       bool   // true면 admin·jobs API에 로그인 강제
+	AuthCookieSecure   bool   // HTTPS 뒤에서 운영할 때 true
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	TossMTLSCertPath   string // 앱인토스 mTLS 클라이언트 인증서
+	TossMTLSKeyPath    string
+	TossAPIBaseURL     string
 }
 
 // Load는 .env를 환경변수에 반영한 뒤 Settings를 만든다.
@@ -65,6 +76,16 @@ func Load(envFile string) Settings {
 		ScheduleTimezone: get("SCHEDULE_TIMEZONE", "Asia/Seoul"),
 
 		RecommendTopK: getInt("RECOMMEND_TOP_K", 5),
+
+		AuthSecret:         get("AUTH_SECRET", ""),
+		AuthRequired:       getBool("AUTH_REQUIRED", false),
+		AuthCookieSecure:   getBool("AUTH_COOKIE_SECURE", false),
+		GoogleClientID:     get("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: get("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:  get("GOOGLE_REDIRECT_URL", "http://localhost:8000/api/v1/auth/google/callback"),
+		TossMTLSCertPath:   get("TOSS_MTLS_CERT_PATH", ""),
+		TossMTLSKeyPath:    get("TOSS_MTLS_KEY_PATH", ""),
+		TossAPIBaseURL:     get("TOSS_API_BASE_URL", ""),
 	}
 }
 

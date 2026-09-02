@@ -84,6 +84,40 @@ type UserResponse struct {
 	Skills      []string `json:"skills"`
 }
 
+// ---------- 인증 ----------
+
+type ProviderStatus struct {
+	Provider  string `json:"provider"`
+	Enabled   bool   `json:"enabled"`
+	LoginPath string `json:"login_path,omitempty"` // redirect 방식(구글)만 제공
+}
+
+type AuthStatus struct {
+	AuthRequired bool             `json:"auth_required"`
+	Providers    []ProviderStatus `json:"providers"`
+}
+
+// ProfileUpdate는 로그인 사용자가 자기 스펙을 수정할 때의 본문이다.
+type ProfileUpdate struct {
+	DesiredJob  string   `json:"desired_job"`
+	CareerYears int      `json:"career_years"`
+	Skills      []string `json:"skills"`
+}
+
+// Validate는 UserPayload와 같은 제약을 username 없이 검사한다.
+func (p ProfileUpdate) Validate() error {
+	if n := len(p.DesiredJob); n < 1 || n > 60 {
+		return fmt.Errorf("desired_job은 1~60자여야 합니다")
+	}
+	if p.CareerYears < 0 || p.CareerYears > 40 {
+		return fmt.Errorf("career_years는 0~40이어야 합니다")
+	}
+	if len(p.Skills) > 20 {
+		return fmt.Errorf("skills는 최대 20개까지 가능합니다")
+	}
+	return nil
+}
+
 // ---------- 어드민 조회 DTO ----------
 
 type Sizes struct {

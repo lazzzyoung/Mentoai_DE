@@ -116,11 +116,66 @@ func (f *fakeAdmin) DeleteCache(context.Context, int64, int64) error      { retu
 
 // ---------- 헬퍼 ----------
 
+// fakeAuth는 인증 포트의 가짜다.
+type fakeAuth struct {
+	status        domain.AuthStatus
+	loginURL      string
+	loginURLok    bool
+	token         string
+	user          domain.UserResponse
+	loginErr      error
+	meErr         error
+	meUser        domain.UserResponse
+	updateErr     error
+	authenticated bool
+	gotUserID     int64
+}
+
+func (f *fakeAuth) Status() domain.AuthStatus              { return f.status }
+func (f *fakeAuth) LoginURL(string, string) (string, bool) { return f.loginURL, f.loginURLok }
+func (f *fakeAuth) Login(_ context.Context, _, _, _ string) (string, domain.UserResponse, error) {
+	if f.loginErr != nil {
+		return "", domain.UserResponse{}, f.loginErr
+	}
+	return f.token, f.user, nil
+}
+func (f *fakeAuth) Me(_ context.Context, userID int64) (domain.UserResponse, error) {
+	f.gotUserID = userID
+	if f.meErr != nil {
+		return domain.UserResponse{}, f.meErr
+	}
+	return f.meUser, nil
+}
+func (f *fakeAuth) UpdateMe(_ context.Context, userID int64, p domain.ProfileUpdate) (domain.UserResponse, error) {
+	if err := p.Validate(); err != nil {
+		return domain.UserResponse{}, domain.Unprocessable(err.Error())
+	}
+	if f.updateErr != nil {
+		return domain.UserResponse{}, f.updateErr
+	}
+	return domain.UserResponse{ID: userID, Username: "u", DesiredJob: p.DesiredJob,
+		CareerYears: p.CareerYears, Skills: p.Skills}, nil
+}
+func (f *fakeAuth) SetSessionCookie(_ http.ResponseWriter, _ string) {}
+func (f *fakeAuth) ClearSessionCookie(_ http.ResponseWriter)         {}
+func (f *fakeAuth) SetStateCookie(_ http.ResponseWriter, _ string)   {}
+func (f *fakeAuth) StateCookie(_ *http.Request) string               { return "" }
+func (f *fakeAuth) Authenticated(_ *http.Request) (int64, string, bool) {
+	if !f.authenticated {
+		return 0, "", false
+	}
+	return 42, "로그인유저", true
+}
+
 func newTestServer(rec *fakeRecommender, ana *fakeAnalyzer, admin *fakeAdmin) *httptest.Server {
+	return newTestServerAuth(rec, ana, admin, &fakeAuth{}, false)
+}
+
+func newTestServerAuth(rec *fakeRecommender, ana *fakeAnalyzer, admin *fakeAdmin, auth *fakeAuth, authRequired bool) *httptest.Server {
 	users := &fakeUsers{users: []domain.UserSummary{
 		{ID: 1, Username: "지원", DesiredJob: "데이터 엔지니어", CareerYears: 2},
 	}}
-	srv := New(users, rec, ana, admin)
+	srv := New(users, rec, ana, admin, auth, authRequired)
 	ts := httptest.NewServer(srv.Handler())
 	return ts
 }
