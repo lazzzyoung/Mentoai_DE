@@ -79,6 +79,33 @@ ssh 서버 sudo systemctl restart mentoai       # 재시작
 ssh 서버 'cd /opt/mentoai && sudo ./mentoai status'   # 데이터 현황
 ```
 
+#### AWS Lightsail 런북 ($5/월 플랜 — 2 vCPU / **512MB** / 20GB)
+
+런타임 실측이 앱 ~25MB + Caddy ~40MB라 512MB로 충분하다. 다만 세 가지만 챙긴다:
+
+1. **스왑**: `SWAP=1`을 붙이면 1GB 스왑을 자동 생성(fstab 등록) — 512MB 인스턴스 필수급
+2. **Lightsail 네트워킹 탭**에서 80/tcp·443/tcp·**443/udp**(HTTP/3) 개방 (22는 기본 열림)
+3. 여유 메모리 확보(선택): Lightsail 우분투 이미지의 snapd 비활성화로 ~100MB 회수
+   `sudo systemctl disable --now snapd snapd.socket && sudo apt-get purge -y snapd`
+
+```bash
+# 1. Lightsail 콘솔: 인스턴스 생성 — 플랫폼 Linux/OS 전용, Ubuntu 24.04, $5 번들
+#    (x86·ARM 모두 가능 — 인스턴스 아키텍처에 맞춰 아래 ARCH 지정)
+# 2. 키 다운로드 후:
+chmod 400 ~/Downloads/LightsailDefaultKey.pem
+
+# 3. 방화벽: 콘솔 Networking 탭에서 80/tcp, 443/tcp, 443/udp 추가
+# 4. 배포 (Mac/Linux에서):
+SSH_KEY=~/Downloads/LightsailDefaultKey.pem SWAP=1 \
+  make deploy-native HOST=ubuntu@인스턴스IP ARCH=amd64
+
+# 5. 도메인 연결 (선택): .env의 CADDY_DOMAIN=도메인 설정 후 DNS A레코드 → 인스턴스 IP,
+#    다시 deploy-native 실행하면 Let's Encrypt 자동 발급
+```
+
+메모리 여유 기준: 임베딩 메모리 인덱스가 공고당 4KB(1024차원)이라 **공고 수천 건까지 쾌적**.
+그 이상은 $7(1GB) 플랜으로 올리거나 `storage.EmbeddingRepo`를 pgvector 등으로 교체(§확장 가이드).
+
 ### Docker (로컬/컨테이너 환경)
 
 ```bash

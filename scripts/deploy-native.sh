@@ -50,6 +50,17 @@ run "apt-get update -qq && apt-get install -y -qq caddy rsync curl openssl"
 run "id -u mentoai >/dev/null 2>&1 || useradd --system --home ${APP_DIR} --shell /usr/sbin/nologin mentoai"
 run "mkdir -p ${APP_DIR}/data"
 
+# --- 선택: SWAP=1 → 1GB 스왑 (RAM 1GB 이하 인스턴스에서 권장, 예: Lightsail $5 = 512MB) ---
+if [[ ${SWAP:-0} == 1 ]]; then
+  if ssh "${SSH_OPTS[@]}" "$TARGET" "swapon --show=NAME --noheadings | grep -q ."; then
+    log "스왑 이미 존재 — 건너뜀"
+  else
+    log "1GB 스왑 파일 생성 (/swapfile, fstab 등록 — 재부팅 후에도 유지)"
+    run "fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile"
+    run "grep -qs '/swapfile' /etc/fstab || printf '/swapfile none swap sw 0 0\n' >> /etc/fstab"
+  fi
+fi
+
 # --- 4) 바이너리 교체 (임시 업로드 후 install — 실행 중 파일 교체 안전) ---
 log "바이너리 전송 (${ARCH})"
 rsync -e "${RSYNC_SSH}" "dist/mentoai-linux-${ARCH}" "${TARGET}:/tmp/mentoai-bin"
