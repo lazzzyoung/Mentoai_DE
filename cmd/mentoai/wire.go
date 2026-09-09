@@ -89,6 +89,13 @@ type App struct {
 
 // Wire는 전체 의존성 그래프를 구성한다(composition root).
 func Wire(settings config.Settings) (*App, error) {
+	adminIDs, err := settings.AdminUserIDs()
+	if err != nil {
+		return nil, err
+	}
+	if settings.AuthRequired && settings.AuthSecret == "" {
+		return nil, fmt.Errorf("AUTH_REQUIRED=true이면 AUTH_SECRET을 설정해야 합니다")
+	}
 	store, err := sqlite.Open(settings.SQLitePath)
 	if err != nil {
 		return nil, err
@@ -171,7 +178,7 @@ func Wire(settings config.Settings) (*App, error) {
 		Store:    store,
 		Ops:      opsService,
 		Active:   active,
-		Server:   api.New(store.Users, rec, ana, opsService, authService, settings.AuthRequired, reporter),
+		Server:   api.New(store.Users, rec, ana, opsService, authService, settings.AuthRequired, reporter, adminIDs...),
 		Schedule: sched,
 		Pipeline: runner,
 		Reporter: reporter,

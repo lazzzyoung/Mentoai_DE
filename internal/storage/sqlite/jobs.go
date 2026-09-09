@@ -20,7 +20,8 @@ const jobColumns = `source, source_id, company, position, location, intro, main_
 	annual_from, annual_to, due_time, skill_tags, pay, link, deadline,
 	full_text, collected_at`
 
-// UpsertJobs는 정제 공고를 한 트랜잭션으로 upsert한다. updated_at은 호출자가 넣는다.
+// UpsertJobs는 정제 공고를 한 트랜잭션으로 upsert한다.
+// updated_at은 신규 또는 임베딩 입력(full_text) 변경 시에만 호출자의 시각을 사용한다.
 func (j *Jobs) UpsertJobs(ctx context.Context, rows []domain.SilverRow, updatedAt time.Time) error {
 	tx, err := j.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -51,7 +52,9 @@ func (j *Jobs) UpsertJobs(ctx context.Context, rows []domain.SilverRow, updatedA
 			deadline = excluded.deadline,
 			full_text = excluded.full_text,
 			collected_at = excluded.collected_at,
-			updated_at = excluded.updated_at`)
+			updated_at = CASE
+				WHEN silver_jobs.full_text IS NOT excluded.full_text THEN excluded.updated_at
+				ELSE silver_jobs.updated_at END`)
 	if err != nil {
 		return err
 	}

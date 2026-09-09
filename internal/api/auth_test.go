@@ -152,9 +152,9 @@ func TestAuthRequiredGate(t *testing.T) {
 	if resp, _ := do(t, http.MethodPost, ts.URL+"/api/v1/jobs/recommend/1", ""); resp.StatusCode != 401 {
 		t.Fatalf("recommend 401 기대: %d", resp.StatusCode)
 	}
-	// users는 항상 개방
-	if resp, _ := do(t, http.MethodGet, ts.URL+"/api/v1/users", ""); resp.StatusCode != 200 {
-		t.Fatalf("users 개방 기대: %d", resp.StatusCode)
+	// 인증 모드의 사용자 목록도 보호한다
+	if resp, _ := do(t, http.MethodGet, ts.URL+"/api/v1/users", ""); resp.StatusCode != 401 {
+		t.Fatalf("users 401 기대: %d", resp.StatusCode)
 	}
 }
 

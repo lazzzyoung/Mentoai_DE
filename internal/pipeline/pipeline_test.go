@@ -129,14 +129,22 @@ func TestRunPipelineEndToEnd(t *testing.T) {
 		t.Fatalf("파이프라인 결과: %+v", result)
 	}
 
-	// 재실행: silver 재업서트가 updated_at을 올리므로 해당 공고는 다시
-	// stale이 되어 재임베딩된다 (원본 Python과 동일한 의도된 동작).
+	// 내용이 같은 공고를 재수집해도 임베딩은 재사용한다.
 	result, err = RunPipeline(ctx, deps, store.Runs, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Embedded != 1 {
-		t.Fatalf("갱신된 공고는 재임베딩 대상: %+v", result)
+	if result.Embedded != 0 {
+		t.Fatalf("변경 없는 공고의 불필요한 재임베딩: %+v", result)
+	}
+
+	// 실제 공고 내용이 달라지면 다시 임베딩한다.
+	changed := bronzeRecords()
+	changed[0].Payload = []byte(`{"id":1,"company":{"name":"A사"},"detail":{"position":"시니어 Go 엔지니어"}}`)
+	deps.Scrapers = []Scraper{okScraper(changed)}
+	result, err = RunPipeline(ctx, deps, store.Runs, 4)
+	if err != nil || result.Embedded != 1 {
+		t.Fatalf("내용 변경 후 재임베딩: %+v %v", result, err)
 	}
 
 	// 실행 이력 성공 기록

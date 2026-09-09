@@ -39,6 +39,10 @@ function metaLine(job) {
 /* ---------- 인재 선택 ---------- */
 
 async function loadUsers() {
+  state.userId = null;
+  $("#recommend-btn").disabled = true;
+  $("#jobs-section").hidden = true;
+  $("#detail-section").hidden = true;
   const container = $("#users");
   try {
     const users = await api("/api/v1/users");
@@ -206,6 +210,7 @@ async function loadAuth() {
       e.preventDefault();
       try { await api("/api/v1/auth/logout", { method: "POST" }); } catch { /* 이미 만료 */ }
       loadAuth();
+      loadUsers();
     });
     return;
   }
@@ -237,6 +242,7 @@ async function loadAuth() {
           body: JSON.stringify({ authorizationCode, referrer }),
         });
         loadAuth();
+        loadUsers();
       } catch (err) { alert(`토스 로그인 실패 — ${err.message}`); }
     });
   }

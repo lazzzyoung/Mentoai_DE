@@ -1,10 +1,12 @@
 // Package analysis는 Gemini 상세 커리어 컨설팅과 캐시를 담당한다.
-// (job_id, user_id, model) 조합당 LLM 호출은 1회만 발생한다.
+// 동일 모델과 동일 분석 입력에 대해 저장된 결과를 재사용한다.
 package analysis
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -74,13 +76,6 @@ func (s *Service) Analyze(ctx context.Context, jobID, userID int64) (domain.Deta
 		return out, domain.NotFound("해당 공고를 찾을 수 없습니다.")
 	}
 
-	model := s.settings.GeminiModel()
-	if cached, ok, err := s.cache.Get(ctx, jobID, userID, model); err != nil {
-		return out, err
-	} else if ok {
-		return decode(cached)
-	}
-
 	prompt := strings.NewReplacer(
 		"{user_specs}", recommend.BuildProfileText(*user),
 		"{company}", defaultStr(job.Company, "미상"),
@@ -88,13 +83,26 @@ func (s *Service) Analyze(ctx context.Context, jobID, userID int64) (domain.Deta
 		"{content}", job.FullText,
 	).Replace(analysisPrompt)
 
+	// 프롬프트 전체를 검증하므로 프로필·공고·프롬프트 지침 변경과
+	// 변경 전에 시작한 요청이 뒤늦게 저장하는 경우에도 오래된 결과를 쓰지 않는다.
+	model := s.settings.GeminiModel()
+	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(prompt)))
+	if cached, ok, err := s.cache.Get(ctx, jobID, userID, model); err != nil {
+		return out, err
+	} else if ok {
+		var entry cacheEntry
+		if json.Unmarshal(cached, &entry) == nil && entry.Fingerprint == fingerprint {
+			return entry.Response, nil
+		}
+	}
+
 	result, err := s.generator.GenerateAnalysis(ctx, prompt)
 	if err != nil {
 		slog.Error("상세 분석 실패", "job_id", jobID, "user_id", userID, "error", err)
 		return out, domain.AsHTTPError(err)
 	}
 
-	payload, err := encode(result)
+	payload, err := json.Marshal(cacheEntry{Fingerprint: fingerprint, Response: result})
 	if err != nil {
 		return out, domain.AsHTTPError(err)
 	}
@@ -104,14 +112,10 @@ func (s *Service) Analyze(ctx context.Context, jobID, userID int64) (domain.Deta
 	return result, nil
 }
 
-func encode(r domain.DetailedAnalysisResponse) ([]byte, error) { return json.Marshal(r) }
-
-func decode(raw []byte) (domain.DetailedAnalysisResponse, error) {
-	var out domain.DetailedAnalysisResponse
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return out, err
-	}
-	return out, nil
+// 기존 캐시(JSON 응답만 저장)는 fingerprint가 없어 한 번 재생성된다.
+type cacheEntry struct {
+	Fingerprint string                          `json:"fingerprint"`
+	Response    domain.DetailedAnalysisResponse `json:"response"`
 }
 
 func defaultStr(s *string, def string) string {

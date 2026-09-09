@@ -154,7 +154,7 @@ mentoai switch-embedding --provider gemini --yes   # 임베딩 모델 전환
 ### 2. 상세 커리어 컨설팅
 * **POST** `/api/v1/jobs/{job_id}/analyze/{user_id}`
 * Gemini가 부족한 역량·액션 플랜·면접 팁을 구조화된 JSON으로 제공.
-* 동일 (공고, 사용자, 모델) 조합은 `analysis_cache`에 캐시되어 **Gemini 호출 1회만** 발생.
+* 동일 (공고, 사용자, 모델) 조합의 분석 입력이 같으면 `analysis_cache`를 재사용. 프로필·공고·프롬프트가 달라지면 새로 분석합니다.
 
 ### 3. 관리자 (`/admin` 페이지 + `/api/v1/admin/*`, CLI와 같은 로직 공유)
 * 현황 대시보드(카운트·테이블 용량·모델·스케줄 다음 실행·진행 중 작업)
@@ -168,7 +168,9 @@ mentoai switch-embedding --provider gemini --yes   # 임베딩 모델 전환
 * **구글**: 표준 OAuth2. `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`(콘솔에 `GOOGLE_REDIRECT_URL` 등록)만 넣으면 상단 "구글로 로그인" 버튼이 활성화된다. 첫 로그인 시 자동 회원가입(users+user_specs 생성) 후 세션 쿠키 발급.
 * **앱인토스**: 클라이언트 SDK(`@apps-in-toss/web-framework`의 `appLogin()`)가 받은 인가 코드를 `POST /api/v1/auth/toss/callback`으로 보내면 서버가 `generate-token`(mTLS 필수, `TOSS_MTLS_CERT_PATH`/`TOSS_MTLS_KEY_PATH`) → `login-me`로 `userKey`를 조회해 로그인 처리.
 * 세션은 DB 없는 HMAC 서명 토큰(`AUTH_SECRET` 필요) — 쿠키(HttpOnly)와 `Authorization: Bearer` 모두 지원, 30일 유효.
-* `AUTH_REQUIRED=true`면 `/api/v1/admin/*`와 `/api/v1/jobs/*`(Gemini 비용 보호)에 401 게이트. `/api/v1/users`·static은 항상 개방.
+* `AUTH_REQUIRED=true`면 API 접근에 로그인이 필요합니다. `/api/v1/jobs/*`는 본인 데이터만 허용하고, `AUTH_ADMIN_USER_IDS`에 등록한 관리자는 사용자 지원을 위해 다른 사용자 데이터에도 접근할 수 있습니다. `/api/v1/admin/*`는 관리자만 허용합니다(일반 사용자 403).
+* 관리자 지정: 로그인 후 `/api/v1/auth/me` 또는 `mentoai users list`에서 ID를 확인하고 `AUTH_ADMIN_USER_IDS=실제ID`를 설정한 뒤 재시작합니다. 여러 ID는 쉼표로 구분하며, 미설정 시 인증 모드의 관리자 API는 모두 거부됩니다. 관리자 계정을 삭제하면 기존 세션도 보호 API에 사용할 수 없습니다.
+* 인증 모드에서 `/api/v1/users`는 일반 사용자에게 본인만, 관리자에게 전체 목록을 반환합니다. 미로그인은 401이며 정적 화면은 개방됩니다. `AUTH_REQUIRED=false`는 기존 무인증 데모 동작을 유지합니다.
 * 로그인 사용자는 `GET/PUT /api/v1/auth/me`로 자기 스펙(직무/경력/스킬)을 직접 관리하고 맞춤 추천을 받는다.
 
 ## 📂 Project Structure
@@ -219,7 +221,7 @@ mentoai_de/
 - 엔드포인트·상태코드(201/204/409/422)·에러 바디 `{"detail": ...}`·한국어 메시지를 그대로 유지해 기존 UI가 무수정 동작한다. (임베딩 모델 목록 응답만 `fastembed` 카탈로그 → `available`(레지스트리)로 교체)
 - `vector(1024)` HNSW → `float32 BLOB` + 프로세스 메모리 코사인 인덱스(쓰기 시 무효화). similarity 산식은 동일(코사인 유사도, 점수 = clamp(round(sim×100), 40, 99)).
 - `text[]`/`jsonb` → JSON TEXT 컬럼, 타임스탬프는 고정폭 UTC 문자열(문자열 비교 = 시간 비교).
-- gold의 재임베딩 판정(신규 / `embedded_at < updated_at` / 모델 불일치)도 동일하다.
+- gold의 재임베딩 판정은 신규 / `embedded_at < updated_at` / 모델 불일치입니다. `updated_at`은 임베딩 입력인 `full_text`가 바뀔 때만 갱신하므로, 수집 시각만 바뀐 동일 공고는 재임베딩하지 않습니다.
 - fastembed(로컬 ONNX)는 Go에 직접 대체재가 없어 미포함. 필요하면 ONNX Runtime 바인딩으로 `Embedder`를 구현해 레지스트리에 등록하면 된다.
 
 ## 🔐 시크릿 관리

@@ -1,6 +1,6 @@
 /* 멘토AI 서비스워커 — 앱 셸 캐시 + 데이터는 항상 네트워크 */
 
-const CACHE_NAME = "mentoai-v1";
+const CACHE_NAME = "mentoai-v2";
 
 const SHELL = [
   "/",

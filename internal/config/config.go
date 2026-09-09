@@ -3,6 +3,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -42,7 +43,8 @@ type Settings struct {
 
 	// --- 인증 (값이 채워진 공급자만 활성화된다) ---
 	AuthSecret         string // 세션 서명 키 (로그인 기능 마스터 스위치)
-	AuthRequired       bool   // true면 admin·jobs API에 로그인 강제
+	AuthAdminUserIDs   string // 쉼표로 구분한 관리자 사용자 ID
+	AuthRequired       bool   // true면 users·admin·jobs API 인증 및 권한 검사
 	AuthCookieSecure   bool   // HTTPS 뒤에서 운영할 때 true
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -86,6 +88,7 @@ func Load(envFile string) Settings {
 		RecommendTopK: getInt("RECOMMEND_TOP_K", 5),
 
 		AuthSecret:         get("AUTH_SECRET", ""),
+		AuthAdminUserIDs:   get("AUTH_ADMIN_USER_IDS", ""),
 		AuthRequired:       getBool("AUTH_REQUIRED", false),
 		AuthCookieSecure:   getBool("AUTH_COOKIE_SECURE", false),
 		GoogleClientID:     get("GOOGLE_CLIENT_ID", ""),
@@ -156,4 +159,20 @@ func getBool(key string, def bool) bool {
 		}
 	}
 	return def
+}
+
+// AdminUserIDs는 잘못된 권한 설정을 시작 시 명시적으로 거부한다.
+func (s Settings) AdminUserIDs() ([]int64, error) {
+	var ids []int64
+	if strings.TrimSpace(s.AuthAdminUserIDs) == "" {
+		return ids, nil
+	}
+	for _, item := range strings.Split(s.AuthAdminUserIDs, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(item), 10, 64)
+		if err != nil || id <= 0 {
+			return nil, fmt.Errorf("AUTH_ADMIN_USER_IDS에는 양의 정수 ID를 쉼표로 구분해 입력하세요")
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

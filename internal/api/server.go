@@ -82,12 +82,19 @@ type Server struct {
 	admin        AdminService
 	auth         AuthService
 	authRequired bool
+	adminIDs     map[int64]bool
 	reporter     ErrorReporter
 }
 
 // New는 의존성을 주입받아 서버를 조립한다.
-func New(users UsersLister, rec Recommender, ana Analyzer, admin AdminService, auth AuthService, authRequired bool, reporter ErrorReporter) *Server {
+func New(users UsersLister, rec Recommender, ana Analyzer, admin AdminService, auth AuthService, authRequired bool, reporter ErrorReporter, adminUserIDs ...int64) *Server {
 	s := &Server{mux: http.NewServeMux(), users: users, rec: rec, ana: ana, admin: admin, auth: auth, authRequired: authRequired, reporter: reporter}
+	s.adminIDs = make(map[int64]bool)
+	for _, id := range adminUserIDs {
+		if id > 0 {
+			s.adminIDs[id] = true
+		}
+	}
 	s.routes()
 	return s
 }
@@ -122,7 +129,7 @@ func (s *Server) routes() {
 	})
 
 	// v1
-	s.mux.HandleFunc("GET /api/v1/users", s.listUsers)
+	s.mux.HandleFunc("GET /api/v1/users", s.guard(s.listUsers))
 	s.mux.HandleFunc("POST /api/v1/jobs/recommend/{user_id}", s.guard(s.recommendJobs))
 	s.mux.HandleFunc("POST /api/v1/jobs/{job_id}/analyze/{user_id}", s.guard(s.analyzeJob))
 
@@ -136,20 +143,20 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.authLogout)
 
 	// admin
-	s.mux.HandleFunc("GET /api/v1/admin/stats", s.guard(s.adminStats))
-	s.mux.HandleFunc("GET /api/v1/admin/pipeline-runs", s.guard(s.adminPipelineRuns))
-	s.mux.HandleFunc("POST /api/v1/admin/pipeline", s.guard(s.adminTriggerPipeline))
-	s.mux.HandleFunc("GET /api/v1/admin/jobs", s.guard(s.adminJobsList))
-	s.mux.HandleFunc("DELETE /api/v1/admin/jobs/{job_id}", s.guard(s.adminDeleteJob))
-	s.mux.HandleFunc("POST /api/v1/admin/users", s.guard(s.adminCreateUser))
-	s.mux.HandleFunc("PUT /api/v1/admin/users/{user_id}", s.guard(s.adminUpdateUser))
-	s.mux.HandleFunc("DELETE /api/v1/admin/users/{user_id}", s.guard(s.adminDeleteUser))
-	s.mux.HandleFunc("GET /api/v1/admin/embedding/models", s.guard(s.adminEmbeddingModels))
-	s.mux.HandleFunc("POST /api/v1/admin/embedding/rebuild", s.guard(s.adminRebuildEmbeddings))
-	s.mux.HandleFunc("POST /api/v1/admin/embedding/switch", s.guard(s.adminSwitchEmbedding))
-	s.mux.HandleFunc("GET /api/v1/admin/cache", s.guard(s.adminCacheList))
-	s.mux.HandleFunc("DELETE /api/v1/admin/cache", s.guard(s.adminCacheClear))
-	s.mux.HandleFunc("DELETE /api/v1/admin/cache/{job_id}/{user_id}", s.guard(s.adminCacheDelete))
+	s.mux.HandleFunc("GET /api/v1/admin/stats", s.adminGuard(s.adminStats))
+	s.mux.HandleFunc("GET /api/v1/admin/pipeline-runs", s.adminGuard(s.adminPipelineRuns))
+	s.mux.HandleFunc("POST /api/v1/admin/pipeline", s.adminGuard(s.adminTriggerPipeline))
+	s.mux.HandleFunc("GET /api/v1/admin/jobs", s.adminGuard(s.adminJobsList))
+	s.mux.HandleFunc("DELETE /api/v1/admin/jobs/{job_id}", s.adminGuard(s.adminDeleteJob))
+	s.mux.HandleFunc("POST /api/v1/admin/users", s.adminGuard(s.adminCreateUser))
+	s.mux.HandleFunc("PUT /api/v1/admin/users/{user_id}", s.adminGuard(s.adminUpdateUser))
+	s.mux.HandleFunc("DELETE /api/v1/admin/users/{user_id}", s.adminGuard(s.adminDeleteUser))
+	s.mux.HandleFunc("GET /api/v1/admin/embedding/models", s.adminGuard(s.adminEmbeddingModels))
+	s.mux.HandleFunc("POST /api/v1/admin/embedding/rebuild", s.adminGuard(s.adminRebuildEmbeddings))
+	s.mux.HandleFunc("POST /api/v1/admin/embedding/switch", s.adminGuard(s.adminSwitchEmbedding))
+	s.mux.HandleFunc("GET /api/v1/admin/cache", s.adminGuard(s.adminCacheList))
+	s.mux.HandleFunc("DELETE /api/v1/admin/cache", s.adminGuard(s.adminCacheClear))
+	s.mux.HandleFunc("DELETE /api/v1/admin/cache/{job_id}/{user_id}", s.adminGuard(s.adminCacheDelete))
 
 	// 모놀리식 UI: 빌드 도구 없는 정적 페이지를 같은 프로세스에서 서빙한다.
 	// "/"는 가장 덜 구체적인 패턴이라 위 라우트들이 우선한다.
@@ -192,12 +199,48 @@ func (s *Server) guard(next http.HandlerFunc) http.HandlerFunc {
 		return next
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, _, ok := s.auth.Authenticated(r); !ok {
+		id, _, ok := s.auth.Authenticated(r)
+		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "로그인이 필요합니다"})
+			return
+		}
+		if _, err := s.auth.Me(r.Context(), id); err != nil {
+			if domain.AsHTTPError(err).Code == http.StatusNotFound {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "사용 가능한 계정이 아닙니다"})
+			} else {
+				s.writeError(w, r, err)
+			}
 			return
 		}
 		next(w, r)
 	}
+}
+
+// adminGuard는 인증 모드에서 명시적으로 지정한 관리자만 허용한다.
+func (s *Server) adminGuard(next http.HandlerFunc) http.HandlerFunc {
+	return s.guard(func(w http.ResponseWriter, r *http.Request) {
+		if s.authRequired {
+			id, _, ok := s.auth.Authenticated(r)
+			if !ok || !s.adminIDs[id] {
+				writeJSON(w, http.StatusForbidden, map[string]string{"detail": "관리자 권한이 필요합니다"})
+				return
+			}
+		}
+		next(w, r)
+	})
+}
+
+// canAccessUser는 URL의 ID를 신뢰하지 않고 세션 소유자와 비교한다.
+func (s *Server) canAccessUser(w http.ResponseWriter, r *http.Request, userID int64) bool {
+	if !s.authRequired {
+		return true
+	}
+	id, _, ok := s.auth.Authenticated(r)
+	if !ok || (id != userID && !s.adminIDs[id]) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"detail": "다른 사용자의 데이터에 접근할 수 없습니다"})
+		return false
+	}
+	return true
 }
 
 // pathInt는 경로 파라미터를 int64로 파싱한다. FastAPI처럼 변환 실패는 422다.

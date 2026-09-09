@@ -131,7 +131,16 @@ func TestJobUpsertAndPendingAndSearch(t *testing.T) {
 		t.Fatalf("검색 결과: %+v", hits)
 	}
 
-	// 공고 갱신(updated_at 증가) → stale 감지
+	// 수집 시각만 달라진 동일 공고는 재임베딩하지 않는다.
+	rows[0].CollectedAt = "2026-09-09T00:00:00Z"
+	if err := store.Jobs.UpsertJobs(ctx, rows, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if pending, err := store.Embeddings.Pending(ctx, "gemini:gemini-embedding-001"); err != nil || len(pending) != 0 {
+		t.Fatalf("동일 공고가 재임베딩 대상으로 지정됨: %+v %v", pending, err)
+	}
+	// 임베딩 입력이 바뀐 공고만 stale 처리한다.
+	rows[0].FullText += " 수정된 업무 내용"
 	if err := store.Jobs.UpsertJobs(ctx, rows[:1], now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)
 	}

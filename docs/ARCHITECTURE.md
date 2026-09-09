@@ -234,7 +234,7 @@ flowchart BT
 | 모듈 | 의미 | 핵심 |
 |---|---|---|
 | `internal/recommend` | "이 사람에게 어떤 공고인가" — 벡터 유사도 + 휴리스틱. **LLM 0호출**로 즉시 응답 | `Recommend`: 프로필 텍스트 임베딩 → `SearchTopK` → `GetMetaByIDs` 하이드레이션 → scoring |
-| `internal/analysis` | "이 공고에 뭐가 부족한가" — Gemini 상세 컨설팅. **(job, user, model)당 호출 1회** 캐시 | `Analyze`: 캐시 확인 → 프롬프트 조립(원본 프롬프트 그대로) → `GenerateAnalysis` → 캐시 저장 |
+| `internal/analysis` | "이 공고에 뭐가 부족한가" — Gemini 상세 컨설팅. **(job, user, model)별 동일 입력 재사용** 캐시 | `Analyze`: 프롬프트 조립 → 입력 해시와 캐시 비교 → 변경 시 `GenerateAnalysis` → 입력 해시와 응답 저장 |
 | `internal/ops` | CLI와 어드민 API가 **항상 같은 로직**을 돌리게 하는 공유 운영 계층. 여기에 없는 기능은 양쪽 인터페이스에 노출하지 않는다 | `Status`(카운트·용량·모델·스케줄), `ListJobs/DeleteJob`, 사용자 CRUD, `RebuildEmbeddings`, `SwitchEmbeddingModel`(.env 갱신→구현체 교체→전량 재임베딩), 캐시 관리, `Guard`(이름 기반 중복 실행 409) |
 | `internal/scheduler` | 파이프라인 cron 스케줄러. `SCHEDULE_ENABLED`일 때만 시작 | `Start`(robfig/cron, `SkipIfStillRunning`+`Recover`), `Info`(다음 실행시각 — live 스케줄러 또는 cron 계산) |
 
@@ -242,7 +242,7 @@ flowchart BT
 
 | 모듈 | 의미 | 핵심 |
 |---|---|---|
-| `internal/api` | HTTP 진입점. **프레임워크 없는** net/http ServeMux(Go 1.22 패턴 라우팅) | v1 3개 + 어드민 14개 + auth 7개 엔드포인트. FastAPI와 동일한 계약 유지: 상태코드(201/204/409/422), 에러 바디 `{"detail": ...}`, 한국어 메시지. `guard` 미들웨어는 `AUTH_REQUIRED=true`일 때만 admin·jobs에 401 게이트. **포트를 자체 선언**(UsersLister/Recommender/Analyzer/AdminService/Auth...)해 테스트에서 가짜 주입 |
+| `internal/api` | HTTP 진입점. **프레임워크 없는** net/http ServeMux(Go 1.22 패턴 라우팅) | v1 3개 + 어드민 14개 + auth 7개 엔드포인트. FastAPI와 동일한 계약 유지: 상태코드(201/204/409/422), 에러 바디 `{"detail": ...}`, 한국어 메시지. `AUTH_REQUIRED=true`에서 users·admin·jobs에 로그인과 계정 존재 여부를 검사하고, admin은 `AUTH_ADMIN_USER_IDS`, jobs는 본인 또는 관리자 권한을 검사. **포트를 자체 선언**(UsersLister/Recommender/Analyzer/AdminService/Auth...)해 테스트에서 가짜 주입 |
 | `internal/web` | 위 4.1 — api가 `FileServerFS`로 서빙 | index/admin/app.js/sw.js/아이콘 |
 
 ### 4.10 조립 (composition root)
@@ -454,7 +454,8 @@ erDiagram
 | 스케줄 | `SCHEDULE_ENABLED` / `SCHEDULE_CRON` / `SCHEDULE_TIMEZONE` | false / `0 9,16 * * *` / Asia/Seoul | |
 | 추천 | `RECOMMEND_TOP_K` | 5 | |
 | 인증 | `AUTH_SECRET` | (빈 값) | 세션 서명 키 — 로그인 마스터 스위치 |
-| 인증 | `AUTH_REQUIRED` | `false` | true면 admin·jobs API에 로그인 강제 |
+| 인증 | `AUTH_ADMIN_USER_IDS` | 비어 있음 | 관리자 사용자 ID 목록(쉼표 구분), 비어 있으면 인증 모드에서 관리자 접근 거부 |
+| 인증 | `AUTH_REQUIRED` | `false` | true면 users·admin·jobs API 인증 및 권한 검사 |
 | 인증 | `AUTH_COOKIE_SECURE` | `false` | HTTPS 뒤 운영 시 true |
 | 인증 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URL` | | 채워지면 구글 로그인 활성화 |
 | 인증 | `TOSS_MTLS_CERT_PATH` / `TOSS_MTLS_KEY_PATH` / `TOSS_API_BASE_URL` | | 채워지면 토스 로그인 활성화 |
@@ -505,3 +506,9 @@ erDiagram
 실행: `make test` (= `go test -race -shuffle=on ./...`). 심화 fuzz:
 `go test ./internal/auth/ -fuzz FuzzSessionVerify -fuzztime 30s` 등.
 정적 검사는 CI에서 gofmt·vet·staticcheck을 돌린다.
+
+### 분석 캐시 및 증분 임베딩 갱신
+
+분석 캐시는 기존 테이블 키 `(job_id, user_id, model)`을 유지하고 `response` JSON에 전체 프롬프트의 SHA-256 `fingerprint`와 실제 `response`를 함께 보관합니다. 입력이 달라지거나 기존 형식의 캐시이면 재생성합니다. 수정 전에 시작한 분석이 나중에 저장되어도 다음 요청에서 입력 해시 불일치로 감지합니다.
+
+Silver upsert는 메타데이터와 수집 시각을 갱신하되 `updated_at`은 `full_text`가 달라질 때만 변경합니다. Gold는 신규·본문 변경·모델 변경 공고만 임베딩합니다.
