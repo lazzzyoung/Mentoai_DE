@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>관리자 ㅣ 멘토AI</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23003b5c'/%3E%3Ctext x='8' y='12' font-size='10' fill='white' text-anchor='middle' font-family='sans-serif' font-weight='bold'%3EM%3C/text%3E%3C/svg%3E">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#003b5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="멘토AI">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <div class="util">
+    <div class="inner">
+      <a href="/" class="util-link">서비스로</a><span class="bar">ㅣ</span><a href="#" class="util-link">로그인</a><span class="bar">ㅣ</span><a href="#" class="util-link">고객센터</a>
+    </div>
+  </div>
+  <div class="header">
+    <div class="inner header-inner">
+      <h1 class="logo"><a href="/admin">멘토<span>AI</span> 관리자</a></h1>
+      <nav class="menu">
+        <a href="#dash">대시보드</a>
+        <a href="#pipeline">파이프라인</a>
+        <a href="#data">데이터</a>
+        <a href="#people">인재</a>
+        <a href="#cache">분석캐시</a>
+      </nav>
+    </div>
+  </div>
+  <div class="crumb">
+    <div class="inner">홈 <span class="bar">&gt;</span> 관리자</div>
+  </div>
+
+  <div class="inner">
+    <!-- 대시보드 -->
+    <section id="dash">
+      <div class="sec-head"><h2 class="sec-title">대시보드</h2><span id="stat-model" class="sec-sub"></span></div>
+      <div id="stat-boxes" class="stats"></div>
+
+      <div class="box ops-box">
+        <h3 class="ops-title">임베딩 운영</h3>
+        <div class="ops-row">
+          <select id="emb-provider" class="inp">
+            <option value="gemini">gemini (API)</option>
+          </select>
+          <input id="emb-model" class="inp wide" list="emb-model-list" placeholder="모델명 (비우면 기본값)">
+          <datalist id="emb-model-list"></datalist>
+          <button id="emb-switch-btn" class="btn sm">모델 전환</button>
+          <button id="emb-rebuild-btn" class="btn ghost sm">전량 재계산</button>
+        </div>
+        <p class="ops-note">전환/재계산은 백그라운드로 실행되며 완료까지 임베딩 현황이 0으로 떨어질 수 있습니다. 모델 전환은 .env를 자동 백업·갱신합니다.</p>
+      </div>
+    </section>
+
+    <!-- 파이프라인 -->
+    <section id="pipeline">
+      <div class="sec-head">
+        <h2 class="sec-title">파이프라인 실행 이력</h2>
+        <span class="pipe-actions"><button id="run-btn" class="btn sm">즉시 실행</button><button id="refresh-btn" class="btn ghost sm">새로고침</button></span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>번호</th><th>상태</th><th>시작</th><th>종료</th><th>수집</th><th>정제</th><th>임베딩</th><th>비고</th></tr></thead>
+        <tbody id="runs-body"><tr><td colspan="8" class="empty">조회 중…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- 공고 데이터 -->
+    <section id="data">
+      <div class="sec-head">
+        <h2 class="sec-title">공고 데이터</h2>
+        <span class="pipe-actions"><input id="job-query" class="inp" type="search" placeholder="회사명·포지션 검색"><button id="job-search-btn" class="btn ghost sm">검색</button></span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>출처</th><th>회사</th><th>포지션</th><th>기술스택</th><th>갱신</th><th>관리</th></tr></thead>
+        <tbody id="jobs-body"><tr><td colspan="7" class="empty">조회 중…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- 인재 관리 -->
+    <section id="people">
+      <div class="sec-head"><h2 class="sec-title">인재 관리 <span id="user-edit-tag" class="sec-sub" hidden>수정 중 — 저장 또는 취소</span></h2></div>
+      <form id="user-form" class="form-row">
+        <input class="inp req" name="username" placeholder="이름" required maxlength="30">
+        <input class="inp req" name="desired_job" placeholder="희망 직무 (예: 데이터 엔지니어)" required maxlength="60">
+        <input class="inp num" name="career_years" type="number" min="0" max="40" value="0" placeholder="경력(년)">
+        <input class="inp" name="skills" placeholder="보유 스킬 (콤마 구분, 예: Python, SQL)">
+        <button type="submit" class="btn sm" id="user-save-btn">등록</button>
+        <button type="button" class="btn ghost sm" id="user-cancel-btn" hidden>취소</button>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>이름</th><th>희망 직무</th><th>경력</th><th>관리</th></tr></thead>
+        <tbody id="users-body"><tr><td colspan="5" class="empty">조회 중…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- 분석 캐시 -->
+    <section id="cache">
+      <div class="sec-head">
+        <h2 class="sec-title">분석 캐시</h2>
+        <button id="cache-clear-btn" class="btn ghost sm danger">전체 삭제</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>사용자</th><th>공고</th><th>모델</th><th>생성</th><th>관리</th></tr></thead>
+        <tbody id="cache-body"><tr><td colspan="5" class="empty">조회 중…</td></tr></tbody>
+      </table>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <div class="inner">
+      <div class="foot-links">
+        <a href="#">이용약관</a><span class="bar">ㅣ</span><a href="#">개인정보처리방침</a><span class="bar">ㅣ</span><a href="#">고객문의</a>
+      </div>
+      <address>© MentoAI Admin. 채용정보 제공 : Wanted ㅣ work24</address>
+    </div>
+  </footer>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

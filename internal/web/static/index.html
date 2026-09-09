@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>맞춤 공고 검색 ㅣ 멘토AI 채용정보</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23003b5c'/%3E%3Ctext x='8' y='12' font-size='10' fill='white' text-anchor='middle' font-family='sans-serif' font-weight='bold'%3EM%3C/text%3E%3C/svg%3E">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#003b5c">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="멘토AI">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <!-- 유틸 -->
+  <div class="util">
+    <div class="inner">
+      <span id="auth-area"><a href="#" class="util-link">로그인</a></span><span class="bar">ㅣ</span><a href="/admin" class="util-link">관리자</a>
+    </div>
+  </div>
+  <!-- GNB -->
+  <div class="header">
+    <div class="inner header-inner">
+      <h1 class="logo"><a href="/">멘토<span>AI</span></a></h1>
+      <nav class="menu">
+        <a href="#" class="on">맞춤공고</a>
+        <a href="#">커리어로드맵</a>
+        <a href="#">기업정보</a>
+      </nav>
+    </div>
+  </div>
+  <!-- 위치 -->
+  <div class="crumb">
+    <div class="inner">홈 <span class="bar">&gt;</span> 맞춤공고 검색</div>
+  </div>
+
+  <div class="inner">
+    <!-- 인재 선택 -->
+    <div class="box">
+      <h2 class="box-title">인재 선택</h2>
+      <p class="box-desc">선택한 인재의 보유 기술·희망 직무 기준으로 공고를 추천합니다.</p>
+      <div id="users" class="people"></div>
+      <div class="btn-area">
+        <button id="recommend-btn" class="btn" disabled>맞춤 공고 조회</button>
+        <span id="setup-error" class="err" hidden></span>
+      </div>
+    </div>
+
+    <!-- 공고 목록 -->
+    <div id="jobs-section" hidden>
+      <div class="sec-head">
+        <h2 class="sec-title">맞춤 공고 <span id="jobs-for" class="sec-sub"></span> <span id="jobs-cnt" class="sec-cnt"></span></h2>
+        <a href="#" class="more">전체공고 더보기 +</a>
+      </div>
+      <div id="jobs" class="list"></div>
+      <p class="list-note">공고를 선택하면 인재 역량 분석 결과가 제공됩니다.</p>
+    </div>
+
+    <!-- 역량 분석 -->
+    <div id="detail-section" hidden>
+      <div class="sec-head">
+        <h2 class="sec-title">역량 분석 결과</h2>
+      </div>
+      <div id="detail"></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <div class="inner">
+      <div class="foot-links">
+        <a href="#">이용약관</a><span class="bar">ㅣ</span><a href="#">개인정보처리방침</a><span class="bar">ㅣ</span><a href="#">고객문의</a><span class="bar">ㅣ</span><a href="#">공지사항</a>
+      </div>
+      <address>© MentoAI. 채용정보 제공 : Wanted ㅣ work24 ㅣ 분석 : Google Gemini</address>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
