@@ -1,0 +1,19 @@
+# Docker 빌드 컨텍스트 최소화
+.git
+.github
+bin/
+data/
+*.db
+*.db-shm
+*.db-wal
+.models/
+.env
+.env.*.bak
+*.log
+*.pptx
+*.pdf
+.zcode/
+compose.yaml
+Caddyfile
+Makefile
+README.md

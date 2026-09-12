@@ -1,0 +1,327 @@
+/* 멘토AI — 국내 포털 표준 문법: 흰 배경, 1px 보더, 조밀한 13px, 네이비/링크블루/키워드레드 */
+
+:root {
+  --navy: #003b5c;
+  --navy-d: #00293f;
+  --blue: #0672ba;
+  --red: #f0411e;
+  --text: #333;
+  --text2: #555;
+  --muted: #888;
+  --line: #e3e3e3;
+  --line2: #f0f0f0;
+  --bg: #f8f9fa;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: #fff;
+  color: var(--text);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.inner { max-width: 1000px; margin: 0 auto; padding: 0 18px; }
+a { color: inherit; text-decoration: none; }
+.bar { margin: 0 2px; color: #ccc; font-size: 12px; }
+
+/* ---------- 유틀/GNB/위치 ---------- */
+
+.util {
+  border-bottom: 1px solid var(--line2);
+  background: #fafafa;
+  font-size: 12px;
+}
+
+.util .inner { display: flex; justify-content: flex-end; align-items: center; height: 32px; }
+.util-link { color: var(--muted); padding: 0 3px; }
+.util-link:hover { color: var(--navy); text-decoration: underline; }
+
+.header { border-bottom: 2px solid var(--navy); }
+
+.header-inner { display: flex; align-items: center; height: 60px; gap: 36px; }
+
+.logo { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -0.5px; }
+.logo a { color: var(--navy); }
+.logo span { color: var(--blue); }
+
+.menu { display: flex; gap: 26px; font-size: 15px; font-weight: 700; }
+.menu a { color: var(--text); padding: 4px 2px; }
+.menu a:hover { color: var(--navy); }
+.menu a.on { color: var(--navy); border-bottom: 2px solid var(--navy); margin-bottom: -2px; }
+
+.crumb {
+  border-bottom: 1px solid var(--line2);
+  background: #fff;
+  font-size: 12px;
+  color: var(--muted);
+}
+.crumb .inner { height: 34px; display: flex; align-items: center; }
+
+/* ---------- 섹션 공통 ---------- */
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 34px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--text);
+}
+
+.sec-title { margin: 0; font-size: 16px; font-weight: 800; color: var(--text); }
+.sec-sub { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.sec-cnt { font-size: 12px; color: var(--blue); font-weight: 700; margin-left: 6px; }
+
+.more { font-size: 12px; color: var(--muted); }
+.more:hover { color: var(--navy); text-decoration: underline; }
+
+.list-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+
+/* ---------- 인재 선택 박스 ---------- */
+
+.box {
+  margin-top: 26px;
+  padding: 20px 22px 22px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.box-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--text); }
+.box-desc { margin: 5px 0 0; font-size: 12.5px; color: var(--muted); }
+
+.people { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.person {
+  display: block;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.person:hover { border-color: var(--navy); }
+
+.person.on {
+  border: 1px solid var(--navy);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.person .p-name { display: block; font-size: 13.5px; font-weight: 700; }
+.person.on .p-name { color: var(--navy); }
+.person .p-spec { display: block; font-size: 12px; color: var(--muted); }
+
+.btn-area { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+
+.btn {
+  padding: 9px 22px;
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) { background: var(--navy-d); border-color: var(--navy-d); }
+.btn:disabled { background: #ccd5db; border-color: #ccd5db; cursor: default; }
+
+.err { font-size: 12.5px; color: var(--red); }
+
+.hint { padding: 26px 0; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--line2); }
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  background: var(--line2);
+  padding: 1px 5px;
+}
+
+/* ---------- 공고 리스트 ---------- */
+
+.list { border-top: 1px solid var(--text); }
+
+.posting {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 15px 12px 14px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line2);
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.posting:hover { background: #fcfcfc; }
+.posting.on { background: var(--bg); box-shadow: inset 3px 0 0 var(--navy); }
+
+.po-company { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.po-src { font-size: 11px; color: #bbb; font-weight: 400; margin-left: 5px; }
+
+.po-title {
+  margin-top: 2px;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.posting:hover .po-title { text-decoration: underline; }
+
+.po-meta { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.po-meta .sep { margin: 0 6px; color: #ddd; }
+.po-meta .kw { font-style: normal; color: var(--red); font-weight: 600; }
+
+.po-reason { margin-top: 3px; font-size: 11.5px; color: #9aa0a6; }
+
+.po-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--line2);
+}
+
+.po-score { text-align: center; }
+.po-score .lb { display: block; font-size: 11px; color: var(--muted); }
+.po-score .vl { font-size: 21px; font-weight: 800; color: var(--navy); line-height: 1.2; }
+.po-score .vl small { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+.po-analyze {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.posting:hover .po-analyze { border-color: var(--navy); }
+.posting.on .po-analyze { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* ---------- 역량 분석 ---------- */
+
+.report { border: 1px solid var(--line); border-top: 2px solid var(--navy); background: #fff; }
+
+.rp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--line2);
+}
+
+.rp-company { font-size: 13px; font-weight: 700; color: var(--text2); }
+.rp-title { margin-top: 2px; font-size: 18px; font-weight: 800; color: var(--text); }
+
+.rp-score { text-align: right; flex-shrink: 0; }
+.rp-score .lb { font-size: 11.5px; color: var(--muted); }
+.rp-score .vl { font-size: 34px; font-weight: 800; color: var(--navy); line-height: 1.15; }
+.rp-score .vl small { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+.rp-body { padding: 4px 22px 22px; }
+.rp-body .summary { margin: 14px 0 0; font-size: 13.5px; }
+
+.rp-body h3 {
+  margin: 22px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #ddd;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.stack { font-size: 0; }
+.stack span {
+  display: inline-block;
+  margin: 0 6px 6px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+}
+.stack span::before { content: "· "; color: #bbb; }
+
+.plan { list-style: none; margin: 0; padding: 0; }
+
+.plan li {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 1px 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line2);
+}
+
+.plan li:last-child { border-bottom: 0; }
+
+.plan .no { font-size: 13px; font-weight: 800; color: var(--navy); }
+.plan .cat { font-size: 11px; color: var(--muted); }
+.plan .nm { font-size: 13.5px; font-weight: 700; }
+.plan .ds { grid-column: 2 / 3; font-size: 12.5px; color: var(--text2); }
+.plan .up { align-self: center; font-size: 12.5px; font-weight: 800; color: var(--red); white-space: nowrap; }
+
+.tip {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-left: 3px solid var(--navy);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+/* ---------- 로딩 ---------- */
+
+.loading { padding: 24px 22px; border: 1px solid var(--line); border-top: 2px solid var(--navy); font-size: 12.5px; color: var(--muted); }
+.loading .rail { position: relative; height: 2px; margin-top: 12px; background: var(--line2); overflow: hidden; }
+.loading .rail i { position: absolute; top: 0; left: -40%; width: 40%; height: 100%; background: var(--navy); animation: go 1.1s linear infinite; }
+@keyframes go { to { left: 100%; } }
+
+/* ---------- 오프라인 배너 ---------- */
+
+.offline-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 0;
+  background: var(--navy);
+  color: #fff;
+  font-size: 12.5px;
+  text-align: center;
+  z-index: 100;
+}
+
+.offline-bar.show { display: block; }
+
+/* ---------- 푸터 ---------- */
+
+.foot { margin-top: 52px; padding: 20px 0 44px; border-top: 1px solid var(--line2); }
+.foot-links { font-size: 12px; }
+.foot-links a { color: var(--text2); }
+.foot-links a:hover { color: var(--navy); text-decoration: underline; }
+.foot address { margin-top: 8px; font-size: 11.5px; font-style: normal; color: #aab0b6; }
+
+@media (max-width: 640px) {
+  .menu { display: none; }
+  .posting { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .po-right { padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--line2); width: 100%; }
+  .rp-head { flex-direction: column; }
+  .rp-score { text-align: left; }
+}

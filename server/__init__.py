@@ -1,1 +1,0 @@
-"""MentoAI server package."""

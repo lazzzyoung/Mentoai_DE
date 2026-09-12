@@ -13,21 +13,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          python-version: "3.11"
+          go-version-file: go.mod
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal)"
 
-      - name: Ruff
-        run: uv run --no-project --with ruff ruff check server tests
+      - name: Vet
+        run: go vet ./...
 
-      - name: Ty
-        run: uv run --no-project --with ty ty check --ignore unresolved-import server
+      - name: Secret scan
+        run: bash scripts/check-secrets.sh
 
-      - name: Pytest
-        env:
-          PYTHONPATH: .
-        run: uv run --no-project --with pytest --with fastapi --with httpx --with python-dotenv pytest -q
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+      - name: Test
+        run: go test -race -shuffle=on ./...

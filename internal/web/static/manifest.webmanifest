@@ -1,0 +1,16 @@
+{
+  "name": "멘토AI - AI 커리어 로드맵",
+  "short_name": "멘토AI",
+  "description": "최신 채용 공고 기반 맞춤 커리어 로드맵 서비스",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#003b5c",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
